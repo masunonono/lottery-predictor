@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ロト6 予測アプリ</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>🎰 ロト6 予測アプリ</h1>
+      <p class="subtitle">過去データの分析から次回の当選番号を予測</p>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="predict">予測</button>
+      <button class="tab" data-tab="analysis">分析</button>
+      <button class="tab" data-tab="history">履歴入力</button>
+    </nav>
+
+    <!-- 予測タブ -->
+    <section id="tab-predict" class="tab-content active">
+      <div class="card">
+        <h2>次回予測番号</h2>
+        <div class="method-selector">
+          <label>予測方法：</label>
+          <select id="predict-method">
+            <optgroup label="基本分析">
+              <option value="hot">ホット数字（出現頻度高）</option>
+              <option value="cold">コールド数字（出現頻度低）</option>
+              <option value="balanced">バランス（ホット＋コールド混合）</option>
+              <option value="frequency-weighted">頻度加重ランダム</option>
+              <option value="random">完全ランダム</option>
+            </optgroup>
+            <optgroup label="高度分析">
+              <option value="interval">出現間隔分析（そろそろ出る数字）</option>
+              <option value="cooccurrence">共起傾向分析（一緒に出やすい組み合わせ）</option>
+              <option value="zone-balance">ゾーンバランス（数字帯の偏り補正）</option>
+              <option value="composite">総合スコア（頻度＋間隔＋共起の複合）</option>
+            </optgroup>
+          </select>
+          <button id="btn-predict" class="btn-primary">予測する</button>
+        </div>
+        <div id="prediction-result" class="prediction-result hidden">
+          <div class="balls-container" id="predicted-balls"></div>
+          <p class="bonus" id="predicted-bonus"></p>
+          <p class="prediction-note" id="prediction-note"></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>直近のホット・コールド数字</h2>
+        <div class="hot-cold-grid">
+          <div>
+            <h3>🔥 ホット数字 TOP5</h3>
+            <div id="hot-numbers" class="number-badges hot"></div>
+          </div>
+          <div>
+            <h3>🧊 コールド数字 TOP5</h3>
+            <div id="cold-numbers" class="number-badges cold"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>複数セット予測</h2>
+        <div class="multi-predict-controls">
+          <label>セット数：</label>
+          <input type="number" id="multi-count" value="5" min="1" max="20">
+          <button id="btn-multi-predict" class="btn-secondary">まとめて予測</button>
+        </div>
+        <div id="multi-prediction-result"></div>
+      </div>
+    </section>
+
+    <!-- 分析タブ -->
+    <section id="tab-analysis" class="tab-content">
+      <div class="card">
+        <h2>数字別出現頻度</h2>
+        <canvas id="frequency-chart" height="120"></canvas>
+      </div>
+      <div class="card">
+        <h2>直近30回の出現頻度</h2>
+        <canvas id="recent-chart" height="120"></canvas>
+      </div>
+      <div class="card">
+        <h2>統計情報</h2>
+        <div id="stats-grid" class="stats-grid"></div>
+      </div>
+
+      <div class="card">
+        <h2>⏱ 出現間隔分析（スコア上位20）</h2>
+        <p class="card-desc">平均出現間隔に対して最後の出現からの経過が長い数字ほどスコアが高くなります。</p>
+        <div id="interval-analysis"></div>
+      </div>
+
+      <div class="card">
+        <h2>🔗 数字の共起傾向（よく一緒に出るペア TOP15）</h2>
+        <p class="card-desc">過去の抽選で同時に出現した回数が多いペアです。</p>
+        <div id="cooccurrence-analysis"></div>
+      </div>
+
+      <div class="card">
+        <h2>🗺 ゾーン別出現バランス</h2>
+        <p class="card-desc">数字帯ごとの実績出現率と期待値との比率です。100%が理想値です。</p>
+        <div id="zone-analysis" class="zone-grid"></div>
+      </div>
+    </section>
+
+    <!-- 履歴入力タブ -->
+    <section id="tab-history" class="tab-content">
+      <div class="card">
+        <h2>当選番号を追加</h2>
+        <div class="input-form">
+          <div class="input-row">
+            <label>回数（任意）</label>
+            <input type="number" id="input-round" placeholder="例: 1980">
+          </div>
+          <div class="input-row">
+            <label>抽選日（任意）</label>
+            <input type="date" id="input-date">
+          </div>
+          <div class="input-row">
+            <label>本数字 (6つ、1〜43)</label>
+            <div class="number-inputs" id="main-inputs">
+              <input type="number" class="num-input" min="1" max="43" placeholder="1〜43">
+              <input type="number" class="num-input" min="1" max="43" placeholder="1〜43">
+              <input type="number" class="num-input" min="1" max="43" placeholder="1〜43">
+              <input type="number" class="num-input" min="1" max="43" placeholder="1〜43">
+              <input type="number" class="num-input" min="1" max="43" placeholder="1〜43">
+              <input type="number" class="num-input" min="1" max="43" placeholder="1〜43">
+            </div>
+          </div>
+          <div class="input-row">
+            <label>ボーナス数字 (1つ)</label>
+            <input type="number" id="bonus-input" class="num-input" min="1" max="43" placeholder="1〜43">
+          </div>
+          <button id="btn-add" class="btn-primary">追加する</button>
+          <p id="input-error" class="error hidden"></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>入力済み履歴 (<span id="history-count">0</span>回分)</h2>
+        <div class="history-controls">
+          <button id="btn-clear" class="btn-danger">全データ削除</button>
+          <button id="btn-load-sample" class="btn-secondary">サンプルデータ読込</button>
+          <button id="btn-export" class="btn-secondary">CSVエクスポート</button>
+        </div>
+        <div id="history-list" class="history-list"></div>
+      </div>
+    </section>
+
+    <footer>
+      <p>※ このアプリの予測は統計的分析に基づくものであり、当選を保証するものではありません。宝くじは運次第です。</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
