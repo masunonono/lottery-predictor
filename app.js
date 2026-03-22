@@ -1,7 +1,32 @@
 'use strict';
 
+// ─── Game config ─────────────────────────────────────────────────────────────
+const GAME_CONFIG = {
+  loto6: {
+    name: 'ロト6', maxNum: 43, pickCount: 6, bonusCount: 1,
+    storageKey: 'loto6_history',
+    zones: [
+      { label: '1〜10',  min: 1,  max: 10, size: 10 },
+      { label: '11〜20', min: 11, max: 20, size: 10 },
+      { label: '21〜30', min: 21, max: 30, size: 10 },
+      { label: '31〜43', min: 31, max: 43, size: 13 }
+    ]
+  },
+  loto7: {
+    name: 'ロト7', maxNum: 37, pickCount: 7, bonusCount: 2,
+    storageKey: 'loto7_history',
+    zones: [
+      { label: '1〜10',  min: 1,  max: 10, size: 10 },
+      { label: '11〜20', min: 11, max: 20, size: 10 },
+      { label: '21〜30', min: 21, max: 30, size: 10 },
+      { label: '31〜37', min: 31, max: 37, size: 7  }
+    ]
+  }
+};
+let currentGame = 'loto6';
+let config = GAME_CONFIG.loto6;
+
 // ─── State ───────────────────────────────────────────────────────────────────
-const STORAGE_KEY = 'loto6_history';
 let history = [];
 let freqChart = null;
 let recentChart = null;
@@ -620,13 +645,731 @@ const SAMPLE_DATA = [
   { round: 1541, date: '2020-12-07', main: [12,26,28,32,33,35], bonus: 41 },
 ];
 
+// ─── ロト7 サンプルデータ (real results from takarakuji.rakuten.co.jp) ────────
+const LOTO7_SAMPLE_DATA = [
+  // 2026年3月
+  { round: 669, date: '2026-03-20', main: [3,5,6,7,9,13,16], bonus: 11, bonus2: 23 },
+  { round: 668, date: '2026-03-13', main: [1,8,11,14,18,22,29], bonus: 19, bonus2: 35 },
+  { round: 667, date: '2026-03-06', main: [9,13,20,22,28,29,33], bonus: 21, bonus2: 23 },
+  // 2026年2月
+  { round: 666, date: '2026-02-27', main: [2,17,18,22,23,25,33], bonus: 16, bonus2: 34 },
+  { round: 665, date: '2026-02-20', main: [6,8,14,19,22,25,35], bonus: 12, bonus2: 17 },
+  { round: 664, date: '2026-02-13', main: [3,6,8,14,21,22,31], bonus: 17, bonus2: 37 },
+  { round: 663, date: '2026-02-06', main: [4,6,10,11,13,17,23], bonus: 25, bonus2: 32 },
+  // 2026年1月
+  { round: 662, date: '2026-01-30', main: [4,14,15,21,22,24,37], bonus: 5, bonus2: 20 },
+  { round: 661, date: '2026-01-23', main: [7,12,17,22,31,34,35], bonus: 20, bonus2: 32 },
+  { round: 660, date: '2026-01-16', main: [4,6,12,13,16,17,31], bonus: 14, bonus2: 20 },
+  { round: 659, date: '2026-01-09', main: [2,8,9,14,27,34,36], bonus: 5, bonus2: 18 },
+  // 2025年12月
+  { round: 658, date: '2025-12-26', main: [10,12,16,18,19,22,37], bonus: 11, bonus2: 20 },
+  { round: 657, date: '2025-12-19', main: [9,11,16,23,27,29,32], bonus: 6, bonus2: 24 },
+  { round: 656, date: '2025-12-12', main: [1,4,6,20,30,34,37], bonus: 14, bonus2: 25 },
+  { round: 655, date: '2025-12-05', main: [4,5,12,13,24,26,33], bonus: 3, bonus2: 14 },
+  // 2025年11月
+  { round: 654, date: '2025-11-28', main: [3,12,25,29,30,32,33], bonus: 28, bonus2: 31 },
+  { round: 653, date: '2025-11-21', main: [6,7,12,25,26,30,33], bonus: 13, bonus2: 15 },
+  { round: 652, date: '2025-11-14', main: [1,16,21,26,27,30,35], bonus: 6, bonus2: 37 },
+  { round: 651, date: '2025-11-07', main: [2,13,19,20,24,26,35], bonus: 29, bonus2: 36 },
+  // 2025年10月
+  { round: 650, date: '2025-10-31', main: [1,8,10,14,25,33,35], bonus: 12, bonus2: 21 },
+  { round: 649, date: '2025-10-24', main: [12,22,23,26,33,35,37], bonus: 2, bonus2: 21 },
+  { round: 648, date: '2025-10-17', main: [3,17,19,24,28,29,35], bonus: 7, bonus2: 13 },
+  { round: 647, date: '2025-10-10', main: [4,5,9,13,17,22,28], bonus: 18, bonus2: 31 },
+  { round: 646, date: '2025-10-03', main: [5,12,13,15,18,35,37], bonus: 11, bonus2: 29 },
+  // 2025年9月
+  { round: 645, date: '2025-09-26', main: [7,10,16,20,26,32,35], bonus: 33, bonus2: 24 },
+  { round: 644, date: '2025-09-19', main: [1,11,12,14,20,26,29], bonus: 5, bonus2: 2 },
+  { round: 643, date: '2025-09-12', main: [1,5,15,16,18,27,34], bonus: 22, bonus2: 19 },
+  { round: 642, date: '2025-09-05', main: [1,7,22,23,33,34,35], bonus: 24, bonus2: 2 },
+  // 2025年8月
+  { round: 641, date: '2025-08-29', main: [1,3,7,23,24,33,36], bonus: 17, bonus2: 30 },
+  { round: 640, date: '2025-08-22', main: [2,7,9,12,13,14,29], bonus: 15, bonus2: 30 },
+  { round: 639, date: '2025-08-15', main: [5,9,12,15,30,31,34], bonus: 13, bonus2: 29 },
+  { round: 638, date: '2025-08-08', main: [1,6,18,19,35,36,37], bonus: 11, bonus2: 24 },
+  { round: 637, date: '2025-08-01', main: [1,4,7,8,9,20,21], bonus: 11, bonus2: 30 },
+  // 2025年7月
+  { round: 636, date: '2025-07-25', main: [10,14,17,20,26,27,29], bonus: 3, bonus2: 11 },
+  { round: 635, date: '2025-07-18', main: [10,12,20,29,30,31,34], bonus: 4, bonus2: 15 },
+  { round: 634, date: '2025-07-11', main: [2,12,18,29,32,36,37], bonus: 5, bonus2: 21 },
+  { round: 633, date: '2025-07-04', main: [2,5,10,17,21,31,36], bonus: 20, bonus2: 32 },
+  // 2025年6月
+  { round: 632, date: '2025-06-27', main: [5,7,10,11,29,31,37], bonus: 13, bonus2: 25 },
+  { round: 631, date: '2025-06-20', main: [2,3,6,17,33,35,36], bonus: 25, bonus2: 37 },
+  { round: 630, date: '2025-06-13', main: [4,6,8,23,28,29,34], bonus: 10, bonus2: 19 },
+  { round: 629, date: '2025-06-06', main: [2,7,9,21,23,24,30], bonus: 22, bonus2: 29 },
+  // 2025年5月
+  { round: 628, date: '2025-05-30', main: [1,8,9,11,18,27,35], bonus: 16, bonus2: 34 },
+  { round: 627, date: '2025-05-23', main: [9,15,21,30,33,34,37], bonus: 10, bonus2: 35 },
+  { round: 626, date: '2025-05-16', main: [1,3,7,12,17,32,34], bonus: 14, bonus2: 30 },
+  { round: 625, date: '2025-05-09', main: [3,10,12,18,19,24,32], bonus: 4, bonus2: 15 },
+  { round: 624, date: '2025-05-02', main: [2,14,15,26,27,34,36], bonus: 9, bonus2: 24 },
+  // 2025年4月
+  { round: 623, date: '2025-04-25', main: [9,12,22,26,28,31,37], bonus: 7, bonus2: 30 },
+  { round: 622, date: '2025-04-18', main: [1,10,28,29,30,33,34], bonus: 21, bonus2: 27 },
+  { round: 621, date: '2025-04-11', main: [1,2,12,13,14,30,36], bonus: 9, bonus2: 24 },
+  { round: 620, date: '2025-04-04', main: [2,4,8,10,12,29,32], bonus: 6, bonus2: 13 },
+  // 2025年3月
+  { round: 619, date: '2025-03-28', main: [8,9,18,20,27,29,32], bonus: 7, bonus2: 12 },
+  { round: 618, date: '2025-03-21', main: [7,17,20,23,24,34,36], bonus: 25, bonus2: 35 },
+  { round: 617, date: '2025-03-14', main: [2,6,10,12,25,28,35], bonus: 27, bonus2: 31 },
+  { round: 616, date: '2025-03-07', main: [7,15,20,28,29,34,36], bonus: 1, bonus2: 35 },
+  // 2025年2月
+  { round: 615, date: '2025-02-28', main: [4,11,21,26,27,28,33], bonus: 10, bonus2: 13 },
+  { round: 614, date: '2025-02-21', main: [14,21,22,23,24,28,34], bonus: 5, bonus2: 37 },
+  { round: 613, date: '2025-02-14', main: [3,5,6,10,19,21,35], bonus: 13, bonus2: 27 },
+  { round: 612, date: '2025-02-07', main: [5,13,16,23,27,31,34], bonus: 26, bonus2: 33 },
+  // 2025年1月
+  { round: 611, date: '2025-01-31', main: [7,8,11,18,20,30,34], bonus: 5, bonus2: 14 },
+  { round: 610, date: '2025-01-24', main: [1,8,9,23,24,31,36], bonus: 21, bonus2: 28 },
+  { round: 609, date: '2025-01-17', main: [4,11,12,23,26,32,37], bonus: 1, bonus2: 9 },
+  { round: 608, date: '2025-01-10', main: [7,10,11,18,20,29,30], bonus: 32, bonus2: 36 },
+  // 2024年12月
+  { round: 607, date: '2024-12-27', main: [12,14,20,27,31,34,37], bonus: 19, bonus2: 21 },
+  { round: 606, date: '2024-12-20', main: [9,17,18,20,22,27,36], bonus: 25, bonus2: 37 },
+  { round: 605, date: '2024-12-13', main: [2,8,15,26,28,31,32], bonus: 19, bonus2: 24 },
+  { round: 604, date: '2024-12-06', main: [4,6,9,12,25,31,36], bonus: 27, bonus2: 30 },
+  // 2024年11月
+  { round: 603, date: '2024-11-29', main: [4,9,10,23,28,30,34], bonus: 18, bonus2: 31 },
+  { round: 602, date: '2024-11-22', main: [7,15,18,24,29,31,34], bonus: 5, bonus2: 25 },
+  { round: 601, date: '2024-11-15', main: [4,8,18,20,29,35,37], bonus: 19, bonus2: 34 },
+  { round: 600, date: '2024-11-08', main: [1,2,12,16,19,29,32], bonus: 9, bonus2: 37 },
+  { round: 599, date: '2024-11-01', main: [4,7,16,19,26,31,33], bonus: 25, bonus2: 29 },
+  // 2024年10月
+  { round: 598, date: '2024-10-25', main: [1,4,7,11,12,18,26], bonus: 3, bonus2: 33 },
+  { round: 597, date: '2024-10-18', main: [2,4,14,15,22,27,34], bonus: 1, bonus2: 5 },
+  { round: 596, date: '2024-10-11', main: [1,9,16,19,23,29,32], bonus: 5, bonus2: 37 },
+  { round: 595, date: '2024-10-04', main: [14,15,16,19,25,28,33], bonus: 6, bonus2: 29 },
+  // 2024年9月
+  { round: 594, date: '2024-09-27', main: [5,12,21,25,27,34,36], bonus: 10, bonus2: 32 },
+  { round: 593, date: '2024-09-20', main: [3,8,9,14,15,22,32], bonus: 1, bonus2: 12 },
+  { round: 592, date: '2024-09-13', main: [3,8,11,15,19,24,32], bonus: 14, bonus2: 30 },
+  { round: 591, date: '2024-09-06', main: [4,7,8,11,21,23,35], bonus: 10, bonus2: 24 },
+  // 2024年8月
+  { round: 590, date: '2024-08-30', main: [1,3,9,10,15,25,35], bonus: 19, bonus2: 28 },
+  { round: 589, date: '2024-08-23', main: [1,6,8,9,14,29,33], bonus: 5, bonus2: 23 },
+  { round: 588, date: '2024-08-16', main: [3,5,9,13,15,21,31], bonus: 12, bonus2: 17 },
+  { round: 587, date: '2024-08-09', main: [15,18,21,22,23,25,32], bonus: 1, bonus2: 30 },
+  { round: 586, date: '2024-08-02', main: [1,2,4,14,15,22,23], bonus: 13, bonus2: 36 },
+  // 2024年7月
+  { round: 585, date: '2024-07-26', main: [6,11,13,14,16,27,34], bonus: 12, bonus2: 25 },
+  { round: 584, date: '2024-07-19', main: [10,11,12,17,23,30,36], bonus: 20, bonus2: 21 },
+  { round: 583, date: '2024-07-12', main: [1,5,8,9,20,30,37], bonus: 11, bonus2: 26 },
+  { round: 582, date: '2024-07-05', main: [5,7,22,29,30,32,36], bonus: 3, bonus2: 33 },
+  // 2024年6月
+  { round: 581, date: '2024-06-28', main: [3,8,10,15,18,23,37], bonus: 17, bonus2: 24 },
+  { round: 580, date: '2024-06-21', main: [4,13,14,15,17,27,33], bonus: 2, bonus2: 11 },
+  { round: 579, date: '2024-06-14', main: [7,19,23,33,34,35,36], bonus: 5, bonus2: 10 },
+  { round: 578, date: '2024-06-07', main: [2,15,19,20,22,31,36], bonus: 13, bonus2: 23 },
+  // 2024年5月
+  { round: 577, date: '2024-05-31', main: [11,13,19,25,29,36,37], bonus: 18, bonus2: 30 },
+  { round: 576, date: '2024-05-24', main: [11,13,14,18,19,23,31], bonus: 7, bonus2: 27 },
+  { round: 575, date: '2024-05-17', main: [2,12,18,20,25,28,30], bonus: 9, bonus2: 23 },
+  { round: 574, date: '2024-05-10', main: [4,5,13,16,22,23,35], bonus: 36, bonus2: 37 },
+  { round: 573, date: '2024-05-03', main: [11,12,18,19,23,26,31], bonus: 15, bonus2: 25 },
+  // 2024年4月
+  { round: 572, date: '2024-04-26', main: [1,2,4,19,21,26,28], bonus: 3, bonus2: 25 },
+  { round: 571, date: '2024-04-19', main: [13,26,27,29,30,34,37], bonus: 2, bonus2: 23 },
+  { round: 570, date: '2024-04-12', main: [1,3,9,12,25,26,35], bonus: 29, bonus2: 31 },
+  { round: 569, date: '2024-04-05', main: [12,15,17,22,30,34,35], bonus: 5, bonus2: 9 },
+  // 2024年3月
+  { round: 568, date: '2024-03-29', main: [8,18,20,29,30,33,34], bonus: 5, bonus2: 23 },
+  { round: 567, date: '2024-03-22', main: [6,8,16,18,19,34,37], bonus: 15, bonus2: 30 },
+  { round: 566, date: '2024-03-15', main: [3,5,18,25,28,35,37], bonus: 7, bonus2: 8 },
+  { round: 565, date: '2024-03-08', main: [3,6,9,11,19,30,36], bonus: 1, bonus2: 33 },
+  { round: 564, date: '2024-03-01', main: [9,13,15,18,22,24,30], bonus: 6, bonus2: 27 },
+  // 2024年2月
+  { round: 563, date: '2024-02-23', main: [1,4,6,14,16,19,31], bonus: 12, bonus2: 18 },
+  { round: 562, date: '2024-02-16', main: [2,14,15,20,28,30,34], bonus: 3, bonus2: 4 },
+  { round: 561, date: '2024-02-09', main: [6,8,19,20,27,32,37], bonus: 13, bonus2: 33 },
+  // 2024年1月・2月初
+  { round: 560, date: '2024-02-02', main: [3,20,29,32,33,34,35], bonus: 2, bonus2: 24 },
+  { round: 559, date: '2024-01-26', main: [3,4,10,13,15,18,22], bonus: 2, bonus2: 16 },
+  { round: 558, date: '2024-01-19', main: [15,20,21,22,23,26,34], bonus: 6, bonus2: 10 },
+  { round: 557, date: '2024-01-12', main: [3,5,7,10,17,18,35], bonus: 2, bonus2: 21 },
+  { round: 556, date: '2024-01-05', main: [17,20,26,28,29,33,35], bonus: 1, bonus2: 6 },
+  // 2023年12月
+  { round: 555, date: '2023-12-29', main: [9,12,17,19,26,32,34], bonus: 11, bonus2: 22 },
+  { round: 554, date: '2023-12-22', main: [4,10,15,17,29,32,36], bonus: 13, bonus2: 30 },
+  { round: 553, date: '2023-12-15', main: [2,6,13,15,16,20,33], bonus: 9, bonus2: 28 },
+  { round: 552, date: '2023-12-08', main: [7,11,12,16,18,33,34], bonus: 1, bonus2: 14 },
+  { round: 551, date: '2023-12-01', main: [15,16,17,22,29,32,37], bonus: 23, bonus2: 24 },
+  // 2023年11月
+  { round: 550, date: '2023-11-24', main: [7,8,13,22,24,29,30], bonus: 10, bonus2: 35 },
+  { round: 549, date: '2023-11-17', main: [13,19,20,28,33,34,35], bonus: 4, bonus2: 32 },
+  { round: 548, date: '2023-11-10', main: [1,13,16,17,18,25,30], bonus: 20, bonus2: 34 },
+  { round: 547, date: '2023-11-03', main: [4,11,14,18,23,25,29], bonus: 17, bonus2: 32 },
+  // 2023年10月
+  { round: 546, date: '2023-10-27', main: [7,14,17,28,33,35,36], bonus: 13, bonus2: 27 },
+  { round: 545, date: '2023-10-20', main: [3,12,16,17,27,30,34], bonus: 15, bonus2: 37 },
+  { round: 544, date: '2023-10-13', main: [10,11,18,21,22,29,34], bonus: 4, bonus2: 32 },
+  { round: 543, date: '2023-10-06', main: [2,11,13,18,23,24,36], bonus: 17, bonus2: 26 },
+  // 2023年9月
+  { round: 542, date: '2023-09-29', main: [2,9,26,31,33,35,36], bonus: 15, bonus2: 20 },
+  { round: 541, date: '2023-09-22', main: [6,14,23,25,27,28,34], bonus: 19, bonus2: 37 },
+  { round: 540, date: '2023-09-15', main: [3,7,10,18,19,28,36], bonus: 13, bonus2: 26 },
+  { round: 539, date: '2023-09-08', main: [4,6,8,18,20,27,35], bonus: 24, bonus2: 26 },
+  { round: 538, date: '2023-09-01', main: [1,2,11,12,16,25,28], bonus: 6, bonus2: 22 },
+  // 2023年8月
+  { round: 537, date: '2023-08-25', main: [2,3,9,13,14,35,37], bonus: 4, bonus2: 17 },
+  { round: 536, date: '2023-08-18', main: [8,12,16,17,22,28,34], bonus: 9, bonus2: 37 },
+  { round: 535, date: '2023-08-11', main: [5,11,12,19,29,32,36], bonus: 9, bonus2: 26 },
+  { round: 534, date: '2023-08-04', main: [10,17,18,19,20,24,25], bonus: 30, bonus2: 32 },
+  // 2023年7月
+  { round: 533, date: '2023-07-28', main: [2,4,9,11,14,25,37], bonus: 29, bonus2: 32 },
+  { round: 532, date: '2023-07-21', main: [4,9,13,18,26,28,36], bonus: 8, bonus2: 16 },
+  { round: 531, date: '2023-07-14', main: [4,6,9,11,14,28,30], bonus: 10, bonus2: 12 },
+  { round: 530, date: '2023-07-07', main: [1,11,13,28,29,30,34], bonus: 23, bonus2: 27 },
+  // 2023年6月
+  { round: 529, date: '2023-06-30', main: [7,9,13,14,22,26,29], bonus: 10, bonus2: 21 },
+  { round: 528, date: '2023-06-23', main: [5,7,10,19,30,32,33], bonus: 1, bonus2: 17 },
+  { round: 527, date: '2023-06-16', main: [4,8,12,25,27,32,34], bonus: 15, bonus2: 17 },
+  { round: 526, date: '2023-06-09', main: [4,13,17,19,20,26,29], bonus: 2, bonus2: 28 },
+  { round: 525, date: '2023-06-02', main: [11,14,17,18,21,25,31], bonus: 1, bonus2: 27 },
+  // 2023年5月
+  { round: 524, date: '2023-05-26', main: [4,17,22,27,29,31,34], bonus: 3, bonus2: 37 },
+  { round: 523, date: '2023-05-19', main: [3,17,19,27,28,32,35], bonus: 2, bonus2: 34 },
+  { round: 522, date: '2023-05-12', main: [1,10,12,19,22,25,37], bonus: 2, bonus2: 34 },
+  { round: 521, date: '2023-05-05', main: [21,24,25,27,30,33,36], bonus: 3, bonus2: 31 },
+  // 2023年4月
+  { round: 520, date: '2023-04-28', main: [9,22,25,28,33,34,37], bonus: 15, bonus2: 16 },
+  { round: 519, date: '2023-04-21', main: [1,2,8,14,17,21,34], bonus: 20, bonus2: 26 },
+  { round: 518, date: '2023-04-14', main: [5,8,11,24,30,32,36], bonus: 4, bonus2: 35 },
+  { round: 517, date: '2023-04-07', main: [3,6,10,16,26,29,31], bonus: 7, bonus2: 24 },
+  // 2023年3月
+  { round: 516, date: '2023-03-31', main: [7,12,15,16,18,25,36], bonus: 9, bonus2: 19 },
+  { round: 515, date: '2023-03-24', main: [3,15,17,22,26,27,28], bonus: 6, bonus2: 8 },
+  { round: 514, date: '2023-03-17', main: [1,5,10,17,20,27,37], bonus: 3, bonus2: 22 },
+  { round: 513, date: '2023-03-10', main: [1,4,10,13,15,19,37], bonus: 16, bonus2: 20 },
+  { round: 512, date: '2023-03-03', main: [5,7,17,22,25,26,28], bonus: 3, bonus2: 23 },
+  // 2023年2月
+  { round: 511, date: '2023-02-24', main: [1,9,14,24,28,36,37], bonus: 16, bonus2: 31 },
+  { round: 510, date: '2023-02-17', main: [3,5,9,11,17,33,37], bonus: 4, bonus2: 22 },
+  { round: 509, date: '2023-02-10', main: [10,14,22,26,27,32,33], bonus: 20, bonus2: 37 },
+  { round: 508, date: '2023-02-03', main: [1,5,6,9,16,26,31], bonus: 25, bonus2: 33 },
+  // 2023年1月
+  { round: 507, date: '2023-01-27', main: [4,19,25,26,30,32,36], bonus: 1, bonus2: 15 },
+  { round: 506, date: '2023-01-20', main: [8,14,19,22,29,31,37], bonus: 3, bonus2: 21 },
+  { round: 505, date: '2023-01-13', main: [9,10,12,15,16,28,36], bonus: 1, bonus2: 23 },
+  { round: 504, date: '2023-01-06', main: [1,3,4,5,6,29,31], bonus: 11, bonus2: 14 },
+  // 2022年12月
+  { round: 503, date: '2022-12-30', main: [5,7,8,13,23,26,33], bonus: 31, bonus2: 37 },
+  { round: 502, date: '2022-12-23', main: [1,2,12,17,21,22,33], bonus: 4, bonus2: 30 },
+  { round: 501, date: '2022-12-16', main: [1,2,4,7,12,14,31], bonus: 30, bonus2: 33 },
+  { round: 500, date: '2022-12-09', main: [17,18,24,30,31,32,35], bonus: 6, bonus2: 36 },
+  { round: 499, date: '2022-12-02', main: [5,9,14,18,27,32,34], bonus: 6, bonus2: 12 },
+  // 2022年11月
+  { round: 498, date: '2022-11-25', main: [6,8,12,20,21,24,29], bonus: 4, bonus2: 18 },
+  { round: 497, date: '2022-11-18', main: [18,20,24,26,27,30,33], bonus: 17, bonus2: 19 },
+  { round: 496, date: '2022-11-11', main: [5,8,15,18,25,27,36], bonus: 10, bonus2: 26 },
+  { round: 495, date: '2022-11-04', main: [2,16,19,20,22,33,36], bonus: 6, bonus2: 32 },
+  // 2022年10月
+  { round: 494, date: '2022-10-28', main: [7,9,12,22,28,29,32], bonus: 17, bonus2: 19 },
+  { round: 493, date: '2022-10-21', main: [5,13,14,20,21,25,31], bonus: 9, bonus2: 36 },
+  { round: 492, date: '2022-10-14', main: [7,10,12,15,23,31,37], bonus: 9, bonus2: 18 },
+  { round: 491, date: '2022-10-07', main: [3,14,17,21,22,32,35], bonus: 6, bonus2: 30 },
+  // 2022年9月
+  { round: 490, date: '2022-09-30', main: [12,14,18,21,23,29,37], bonus: 7, bonus2: 15 },
+  { round: 489, date: '2022-09-23', main: [3,6,7,15,25,29,31], bonus: 8, bonus2: 14 },
+  { round: 488, date: '2022-09-16', main: [3,13,16,18,19,20,35], bonus: 2, bonus2: 11 },
+  { round: 487, date: '2022-09-09', main: [9,10,13,15,26,34,37], bonus: 22, bonus2: 36 },
+  { round: 486, date: '2022-09-02', main: [8,13,15,23,24,31,35], bonus: 14, bonus2: 19 },
+  // 2022年8月
+  { round: 485, date: '2022-08-26', main: [4,6,17,20,22,24,26], bonus: 8, bonus2: 9 },
+  { round: 484, date: '2022-08-19', main: [1,4,6,9,13,22,31], bonus: 29, bonus2: 30 },
+  { round: 483, date: '2022-08-12', main: [2,11,20,23,25,36,37], bonus: 29, bonus2: 34 },
+  { round: 482, date: '2022-08-05', main: [2,5,14,15,17,19,36], bonus: 8, bonus2: 34 },
+  { round: 481, date: '2022-07-29', main: [1,10,13,14,16,25,27], bonus: 5, bonus2: 21 },
+  // 〜 第480回〜第1回 (2013年4月〜2022年7月)
+  { round: 480, date: '2022-07-22', main: [10,13,19,21,26,30,36], bonus: 22, bonus2: 34 },
+  { round: 479, date: '2022-07-15', main: [8,11,13,18,24,30,31], bonus: 21, bonus2: 23 },
+  { round: 478, date: '2022-07-08', main: [6,8,11,13,16,20,32], bonus: 12, bonus2: 34 },
+  { round: 477, date: '2022-07-01', main: [2,5,9,19,25,32,37], bonus: 7, bonus2: 29 },
+  { round: 476, date: '2022-06-24', main: [4,7,9,15,22,24,31], bonus: 21, bonus2: 37 },
+  { round: 475, date: '2022-06-17', main: [1,2,22,24,26,31,37], bonus: 12, bonus2: 19 },
+  { round: 474, date: '2022-06-10', main: [3,17,19,21,24,32,34], bonus: 27, bonus2: 28 },
+  { round: 473, date: '2022-06-03', main: [6,11,21,24,28,33,37], bonus: 8, bonus2: 27 },
+  { round: 472, date: '2022-05-27', main: [5,7,8,32,33,34,36], bonus: 4, bonus2: 6 },
+  { round: 471, date: '2022-05-20', main: [3,5,7,8,11,19,34], bonus: 17, bonus2: 32 },
+  { round: 470, date: '2022-05-13', main: [2,3,9,16,27,32,36], bonus: 1, bonus2: 34 },
+  { round: 469, date: '2022-05-06', main: [1,6,8,13,16,30,33], bonus: 23, bonus2: 28 },
+  { round: 468, date: '2022-04-29', main: [3,12,15,16,25,29,37], bonus: 26, bonus2: 28 },
+  { round: 467, date: '2022-04-22', main: [7,8,11,13,14,26,30], bonus: 31, bonus2: 34 },
+  { round: 466, date: '2022-04-15', main: [5,6,8,14,15,25,29], bonus: 18, bonus2: 33 },
+  { round: 465, date: '2022-04-08', main: [1,4,5,13,27,31,35], bonus: 15, bonus2: 22 },
+  { round: 464, date: '2022-04-01', main: [7,8,13,17,30,32,36], bonus: 1, bonus2: 10 },
+  { round: 463, date: '2022-03-25', main: [3,7,13,16,19,24,30], bonus: 6, bonus2: 10 },
+  { round: 462, date: '2022-03-18', main: [7,11,24,27,29,34,35], bonus: 4, bonus2: 18 },
+  { round: 461, date: '2022-03-11', main: [2,13,19,22,32,35,37], bonus: 14, bonus2: 33 },
+  { round: 460, date: '2022-03-04', main: [5,6,9,23,27,28,30], bonus: 4, bonus2: 13 },
+  { round: 459, date: '2022-02-25', main: [2,4,7,8,10,20,29], bonus: 14, bonus2: 33 },
+  { round: 458, date: '2022-02-18', main: [7,11,12,14,19,21,33], bonus: 6, bonus2: 37 },
+  { round: 457, date: '2022-02-11', main: [7,14,19,27,31,35,36], bonus: 9, bonus2: 33 },
+  { round: 456, date: '2022-02-04', main: [9,15,17,18,22,25,31], bonus: 33, bonus2: 36 },
+  { round: 455, date: '2022-01-28', main: [1,5,8,15,18,26,36], bonus: 33, bonus2: 34 },
+  { round: 454, date: '2022-01-21', main: [8,17,21,26,27,29,31], bonus: 1, bonus2: 33 },
+  { round: 453, date: '2022-01-14', main: [2,8,10,21,24,26,35], bonus: 9, bonus2: 13 },
+  { round: 452, date: '2022-01-07', main: [5,17,20,21,31,34,35], bonus: 8, bonus2: 27 },
+  { round: 451, date: '2021-12-24', main: [2,15,22,25,28,33,37], bonus: 10, bonus2: 17 },
+  { round: 450, date: '2021-12-17', main: [2,7,12,15,21,23,30], bonus: 9, bonus2: 31 },
+  { round: 449, date: '2021-12-10', main: [2,21,26,27,32,33,34], bonus: 8, bonus2: 9 },
+  { round: 448, date: '2021-12-03', main: [7,21,24,29,32,36,37], bonus: 22, bonus2: 27 },
+  { round: 447, date: '2021-11-26', main: [3,5,8,13,26,30,37], bonus: 25, bonus2: 28 },
+  { round: 446, date: '2021-11-19', main: [1,7,9,12,15,29,32], bonus: 11, bonus2: 28 },
+  { round: 445, date: '2021-11-12', main: [4,22,25,27,28,30,33], bonus: 2, bonus2: 3 },
+  { round: 444, date: '2021-11-05', main: [11,15,16,17,18,27,29], bonus: 25, bonus2: 33 },
+  { round: 443, date: '2021-10-29', main: [1,5,8,26,28,32,36], bonus: 23, bonus2: 24 },
+  { round: 442, date: '2021-10-22', main: [6,13,14,16,19,30,32], bonus: 25, bonus2: 36 },
+  { round: 441, date: '2021-10-15', main: [15,21,22,23,27,28,37], bonus: 8, bonus2: 25 },
+  { round: 440, date: '2021-10-08', main: [5,10,17,18,19,22,32], bonus: 14, bonus2: 35 },
+  { round: 439, date: '2021-10-01', main: [1,3,6,9,26,29,31], bonus: 14, bonus2: 18 },
+  { round: 438, date: '2021-09-24', main: [4,13,16,21,32,34,37], bonus: 27, bonus2: 33 },
+  { round: 437, date: '2021-09-17', main: [8,10,14,15,23,25,26], bonus: 1, bonus2: 11 },
+  { round: 436, date: '2021-09-10', main: [5,6,21,22,26,31,32], bonus: 18, bonus2: 36 },
+  { round: 435, date: '2021-09-03', main: [3,5,7,11,15,17,25], bonus: 13, bonus2: 32 },
+  { round: 434, date: '2021-08-27', main: [10,11,12,17,29,34,37], bonus: 26, bonus2: 30 },
+  { round: 433, date: '2021-08-20', main: [14,17,20,25,32,33,36], bonus: 10, bonus2: 34 },
+  { round: 432, date: '2021-08-13', main: [5,10,13,24,29,30,35], bonus: 21, bonus2: 31 },
+  { round: 431, date: '2021-08-06', main: [7,11,12,17,19,20,26], bonus: 2, bonus2: 3 },
+  { round: 430, date: '2021-07-30', main: [2,12,17,24,28,30,32], bonus: 3, bonus2: 27 },
+  { round: 429, date: '2021-07-23', main: [6,11,14,27,30,32,35], bonus: 18, bonus2: 24 },
+  { round: 428, date: '2021-07-16', main: [3,6,16,22,31,34,35], bonus: 24, bonus2: 32 },
+  { round: 427, date: '2021-07-09', main: [11,13,26,27,31,33,37], bonus: 9, bonus2: 18 },
+  { round: 426, date: '2021-07-02', main: [1,2,6,8,30,31,33], bonus: 13, bonus2: 35 },
+  { round: 425, date: '2021-06-25', main: [2,9,14,20,22,34,35], bonus: 7, bonus2: 24 },
+  { round: 424, date: '2021-06-18', main: [5,6,12,19,25,30,35], bonus: 26, bonus2: 33 },
+  { round: 423, date: '2021-06-11', main: [1,7,9,11,29,31,32], bonus: 2, bonus2: 6 },
+  { round: 422, date: '2021-06-04', main: [1,9,21,23,30,35,36], bonus: 5, bonus2: 6 },
+  { round: 421, date: '2021-05-28', main: [9,15,18,26,28,32,37], bonus: 21, bonus2: 36 },
+  { round: 420, date: '2021-05-21', main: [4,5,11,13,24,32,34], bonus: 2, bonus2: 3 },
+  { round: 419, date: '2021-05-14', main: [3,11,14,21,26,29,34], bonus: 22, bonus2: 33 },
+  { round: 418, date: '2021-05-07', main: [10,13,17,18,22,28,37], bonus: 1, bonus2: 20 },
+  { round: 417, date: '2021-04-30', main: [4,5,13,18,23,27,32], bonus: 9, bonus2: 11 },
+  { round: 416, date: '2021-04-23', main: [8,9,10,15,16,30,31], bonus: 29, bonus2: 36 },
+  { round: 415, date: '2021-04-16', main: [4,8,12,13,23,32,37], bonus: 16, bonus2: 35 },
+  { round: 414, date: '2021-04-09', main: [3,8,16,21,25,36,37], bonus: 14, bonus2: 20 },
+  { round: 413, date: '2021-04-02', main: [3,10,16,18,19,34,35], bonus: 27, bonus2: 36 },
+  { round: 412, date: '2021-03-26', main: [14,20,22,29,31,33,34], bonus: 15, bonus2: 24 },
+  { round: 411, date: '2021-03-19', main: [4,11,12,21,23,27,36], bonus: 9, bonus2: 14 },
+  { round: 410, date: '2021-03-12', main: [1,2,18,21,26,29,37], bonus: 9, bonus2: 36 },
+  { round: 409, date: '2021-03-05', main: [13,15,16,24,30,31,37], bonus: 12, bonus2: 33 },
+  { round: 408, date: '2021-02-26', main: [16,18,19,21,29,30,35], bonus: 14, bonus2: 28 },
+  { round: 407, date: '2021-02-19', main: [19,21,25,26,28,30,31], bonus: 9, bonus2: 16 },
+  { round: 406, date: '2021-02-12', main: [1,2,5,16,18,21,29], bonus: 24, bonus2: 25 },
+  { round: 405, date: '2021-02-05', main: [3,10,16,17,24,32,36], bonus: 11, bonus2: 29 },
+  { round: 404, date: '2021-01-29', main: [4,8,13,16,25,30,32], bonus: 9, bonus2: 26 },
+  { round: 403, date: '2021-01-22', main: [2,6,8,12,19,20,29], bonus: 5, bonus2: 26 },
+  { round: 402, date: '2021-01-15', main: [7,9,12,17,20,26,29], bonus: 4, bonus2: 13 },
+  { round: 401, date: '2021-01-08', main: [4,5,9,14,18,30,35], bonus: 1, bonus2: 33 },
+  { round: 400, date: '2020-12-25', main: [4,17,22,28,30,31,35], bonus: 25, bonus2: 34 },
+  { round: 399, date: '2020-12-18', main: [7,15,19,20,21,33,36], bonus: 4, bonus2: 10 },
+  { round: 398, date: '2020-12-11', main: [3,4,10,17,20,22,33], bonus: 1, bonus2: 6 },
+  { round: 397, date: '2020-12-04', main: [4,12,13,15,21,28,37], bonus: 7, bonus2: 20 },
+  { round: 396, date: '2020-11-27', main: [2,3,5,8,16,20,34], bonus: 26, bonus2: 31 },
+  { round: 395, date: '2020-11-20', main: [1,2,5,20,26,29,32], bonus: 8, bonus2: 9 },
+  { round: 394, date: '2020-11-13', main: [6,10,22,23,27,32,33], bonus: 8, bonus2: 19 },
+  { round: 393, date: '2020-11-06', main: [7,14,15,22,27,30,31], bonus: 9, bonus2: 32 },
+  { round: 392, date: '2020-10-30', main: [1,4,6,15,20,22,26], bonus: 18, bonus2: 21 },
+  { round: 391, date: '2020-10-23', main: [10,23,27,32,33,35,37], bonus: 24, bonus2: 26 },
+  { round: 390, date: '2020-10-16', main: [3,6,19,21,23,26,27], bonus: 30, bonus2: 34 },
+  { round: 389, date: '2020-10-09', main: [1,6,11,13,18,24,27], bonus: 17, bonus2: 23 },
+  { round: 388, date: '2020-10-02', main: [1,6,8,10,18,21,32], bonus: 13, bonus2: 28 },
+  { round: 387, date: '2020-09-25', main: [3,7,13,22,30,32,37], bonus: 14, bonus2: 15 },
+  { round: 386, date: '2020-09-18', main: [9,19,22,32,35,36,37], bonus: 7, bonus2: 21 },
+  { round: 385, date: '2020-09-11', main: [4,12,14,24,29,34,35], bonus: 5, bonus2: 15 },
+  { round: 384, date: '2020-09-04', main: [3,7,15,18,26,30,31], bonus: 9, bonus2: 33 },
+  { round: 383, date: '2020-08-28', main: [8,11,15,22,26,28,30], bonus: 10, bonus2: 20 },
+  { round: 382, date: '2020-08-21', main: [2,3,5,8,19,22,37], bonus: 16, bonus2: 28 },
+  { round: 381, date: '2020-08-14', main: [4,8,25,26,27,31,32], bonus: 9, bonus2: 22 },
+  { round: 380, date: '2020-08-07', main: [8,14,24,25,32,34,36], bonus: 13, bonus2: 16 },
+  { round: 379, date: '2020-07-31', main: [3,8,15,22,24,29,35], bonus: 18, bonus2: 26 },
+  { round: 378, date: '2020-07-24', main: [1,5,9,10,14,15,29], bonus: 20, bonus2: 28 },
+  { round: 377, date: '2020-07-17', main: [6,7,10,17,25,33,36], bonus: 27, bonus2: 32 },
+  { round: 376, date: '2020-07-10', main: [6,11,14,17,23,31,37], bonus: 10, bonus2: 15 },
+  { round: 375, date: '2020-07-03', main: [13,15,18,19,23,27,32], bonus: 34, bonus2: 35 },
+  { round: 374, date: '2020-06-26', main: [4,5,9,10,18,27,35], bonus: 15, bonus2: 34 },
+  { round: 373, date: '2020-06-19', main: [2,3,17,18,22,23,31], bonus: 4, bonus2: 30 },
+  { round: 372, date: '2020-06-12', main: [6,8,22,23,32,33,36], bonus: 9, bonus2: 27 },
+  { round: 371, date: '2020-06-05', main: [1,3,4,8,11,21,25], bonus: 12, bonus2: 23 },
+  { round: 370, date: '2020-05-29', main: [7,10,16,25,26,33,34], bonus: 24, bonus2: 35 },
+  { round: 369, date: '2020-05-22', main: [1,7,9,11,15,31,34], bonus: 6, bonus2: 33 },
+  { round: 368, date: '2020-05-15', main: [7,8,9,13,21,34,35], bonus: 3, bonus2: 20 },
+  { round: 367, date: '2020-05-08', main: [8,14,19,20,29,30,31], bonus: 7, bonus2: 35 },
+  { round: 366, date: '2020-05-01', main: [10,24,25,26,27,33,36], bonus: 4, bonus2: 23 },
+  { round: 365, date: '2020-04-24', main: [1,4,13,14,16,22,35], bonus: 10, bonus2: 23 },
+  { round: 364, date: '2020-04-17', main: [3,9,10,14,16,20,27], bonus: 19, bonus2: 33 },
+  { round: 363, date: '2020-04-10', main: [13,15,17,22,26,34,36], bonus: 3, bonus2: 19 },
+  { round: 362, date: '2020-04-03', main: [4,7,8,14,22,24,27], bonus: 13, bonus2: 26 },
+  { round: 361, date: '2020-03-27', main: [5,9,16,20,29,33,35], bonus: 2, bonus2: 8 },
+  { round: 360, date: '2020-03-20', main: [9,11,13,14,20,22,37], bonus: 15, bonus2: 17 },
+  { round: 359, date: '2020-03-13', main: [4,7,11,17,19,26,35], bonus: 1, bonus2: 24 },
+  { round: 358, date: '2020-03-06', main: [5,13,14,26,32,33,34], bonus: 8, bonus2: 11 },
+  { round: 357, date: '2020-02-28', main: [5,8,12,13,14,24,30], bonus: 27, bonus2: 35 },
+  { round: 356, date: '2020-02-21', main: [4,16,20,30,33,34,36], bonus: 19, bonus2: 21 },
+  { round: 355, date: '2020-02-14', main: [4,6,9,10,23,27,33], bonus: 14, bonus2: 31 },
+  { round: 354, date: '2020-02-07', main: [1,2,8,10,13,25,31], bonus: 23, bonus2: 35 },
+  { round: 353, date: '2020-01-31', main: [11,15,22,23,24,29,33], bonus: 19, bonus2: 34 },
+  { round: 352, date: '2020-01-24', main: [3,4,14,18,26,30,32], bonus: 28, bonus2: 34 },
+  { round: 351, date: '2020-01-17', main: [8,13,17,19,23,25,28], bonus: 5, bonus2: 16 },
+  { round: 350, date: '2020-01-10', main: [10,19,21,23,24,30,37], bonus: 2, bonus2: 28 },
+  { round: 349, date: '2019-12-27', main: [4,10,11,15,18,22,34], bonus: 16, bonus2: 32 },
+  { round: 348, date: '2019-12-20', main: [2,5,17,18,19,20,33], bonus: 1, bonus2: 24 },
+  { round: 347, date: '2019-12-13', main: [3,6,11,13,18,20,34], bonus: 25, bonus2: 35 },
+  { round: 346, date: '2019-12-06', main: [11,16,18,23,30,31,35], bonus: 3, bonus2: 27 },
+  { round: 345, date: '2019-11-29', main: [6,9,10,18,28,31,32], bonus: 24, bonus2: 35 },
+  { round: 344, date: '2019-11-22', main: [11,19,28,29,31,32,37], bonus: 12, bonus2: 21 },
+  { round: 343, date: '2019-11-15', main: [17,19,22,29,30,31,32], bonus: 11, bonus2: 16 },
+  { round: 342, date: '2019-11-08', main: [3,6,24,28,32,35,36], bonus: 4, bonus2: 8 },
+  { round: 341, date: '2019-11-01', main: [4,11,17,27,29,31,36], bonus: 19, bonus2: 24 },
+  { round: 340, date: '2019-10-25', main: [6,14,17,26,27,30,36], bonus: 12, bonus2: 28 },
+  { round: 339, date: '2019-10-18', main: [11,15,18,20,23,25,32], bonus: 9, bonus2: 37 },
+  { round: 338, date: '2019-10-11', main: [7,9,16,17,23,27,34], bonus: 15, bonus2: 36 },
+  { round: 337, date: '2019-10-04', main: [5,7,10,12,14,24,35], bonus: 11, bonus2: 33 },
+  { round: 336, date: '2019-09-27', main: [9,10,13,21,25,31,33], bonus: 24, bonus2: 37 },
+  { round: 335, date: '2019-09-20', main: [9,10,17,18,22,25,35], bonus: 13, bonus2: 14 },
+  { round: 334, date: '2019-09-13', main: [3,7,15,16,30,34,35], bonus: 8, bonus2: 29 },
+  { round: 333, date: '2019-09-06', main: [1,4,10,11,16,24,34], bonus: 30, bonus2: 32 },
+  { round: 332, date: '2019-08-30', main: [5,7,10,15,24,27,30], bonus: 3, bonus2: 33 },
+  { round: 331, date: '2019-08-23', main: [5,7,11,12,15,18,20], bonus: 19, bonus2: 30 },
+  { round: 330, date: '2019-08-16', main: [3,4,10,12,17,18,20], bonus: 19, bonus2: 32 },
+  { round: 329, date: '2019-08-09', main: [3,10,19,20,26,28,30], bonus: 15, bonus2: 25 },
+  { round: 328, date: '2019-08-02', main: [3,9,10,14,19,24,30], bonus: 18, bonus2: 21 },
+  { round: 327, date: '2019-07-26', main: [1,3,13,14,16,30,31], bonus: 2, bonus2: 17 },
+  { round: 326, date: '2019-07-19', main: [1,2,17,18,24,27,29], bonus: 12, bonus2: 32 },
+  { round: 325, date: '2019-07-12', main: [4,14,17,18,21,31,33], bonus: 6, bonus2: 20 },
+  { round: 324, date: '2019-07-05', main: [9,13,16,17,18,19,20], bonus: 30, bonus2: 36 },
+  { round: 323, date: '2019-06-28', main: [11,14,15,21,26,34,36], bonus: 23, bonus2: 27 },
+  { round: 322, date: '2019-06-21', main: [1,10,11,21,26,29,30], bonus: 14, bonus2: 20 },
+  { round: 321, date: '2019-06-14', main: [15,24,27,28,29,34,35], bonus: 9, bonus2: 25 },
+  { round: 320, date: '2019-06-07', main: [5,6,18,22,26,33,34], bonus: 36, bonus2: 37 },
+  { round: 319, date: '2019-05-31', main: [2,6,14,23,28,31,35], bonus: 19, bonus2: 27 },
+  { round: 318, date: '2019-05-24', main: [4,5,10,12,27,34,36], bonus: 3, bonus2: 14 },
+  { round: 317, date: '2019-05-17', main: [7,8,14,15,16,20,29], bonus: 18, bonus2: 19 },
+  { round: 316, date: '2019-05-10', main: [3,9,10,17,30,33,34], bonus: 6, bonus2: 8 },
+  { round: 315, date: '2019-05-03', main: [3,11,18,26,30,33,37], bonus: 28, bonus2: 31 },
+  { round: 314, date: '2019-04-26', main: [3,6,8,19,32,34,35], bonus: 12, bonus2: 30 },
+  { round: 313, date: '2019-04-19', main: [9,13,16,23,28,29,30], bonus: 1, bonus2: 20 },
+  { round: 312, date: '2019-04-12', main: [1,2,4,18,20,29,34], bonus: 17, bonus2: 30 },
+  { round: 311, date: '2019-04-05', main: [9,11,18,24,26,27,37], bonus: 30, bonus2: 33 },
+  { round: 310, date: '2019-03-29', main: [17,25,26,28,31,32,37], bonus: 6, bonus2: 9 },
+  { round: 309, date: '2019-03-22', main: [1,7,13,14,16,21,22], bonus: 18, bonus2: 34 },
+  { round: 308, date: '2019-03-15', main: [5,6,11,15,20,32,33], bonus: 13, bonus2: 25 },
+  { round: 307, date: '2019-03-08', main: [5,8,15,24,25,32,35], bonus: 20, bonus2: 26 },
+  { round: 306, date: '2019-03-01', main: [12,13,15,22,25,33,35], bonus: 1, bonus2: 31 },
+  { round: 305, date: '2019-02-22', main: [6,17,23,24,27,28,31], bonus: 10, bonus2: 18 },
+  { round: 304, date: '2019-02-15', main: [7,9,10,17,28,33,36], bonus: 18, bonus2: 23 },
+  { round: 303, date: '2019-02-08', main: [4,7,14,17,21,34,37], bonus: 10, bonus2: 30 },
+  { round: 302, date: '2019-02-01', main: [8,16,26,27,28,32,34], bonus: 4, bonus2: 25 },
+  { round: 301, date: '2019-01-25', main: [4,11,12,25,27,30,33], bonus: 5, bonus2: 19 },
+  { round: 300, date: '2019-01-18', main: [4,7,21,31,33,34,35], bonus: 6, bonus2: 12 },
+  { round: 299, date: '2019-01-11', main: [1,6,10,13,16,26,36], bonus: 28, bonus2: 30 },
+  { round: 298, date: '2019-01-04', main: [1,3,8,11,18,19,22], bonus: 26, bonus2: 30 },
+  { round: 297, date: '2018-12-28', main: [2,3,11,16,23,28,36], bonus: 8, bonus2: 24 },
+  { round: 296, date: '2018-12-21', main: [1,8,10,12,18,28,29], bonus: 25, bonus2: 27 },
+  { round: 295, date: '2018-12-14', main: [4,5,6,8,9,22,32], bonus: 13, bonus2: 26 },
+  { round: 294, date: '2018-12-07', main: [3,4,6,10,14,22,29], bonus: 28, bonus2: 32 },
+  { round: 293, date: '2018-11-30', main: [11,13,15,20,27,29,35], bonus: 1, bonus2: 7 },
+  { round: 292, date: '2018-11-23', main: [12,15,25,26,27,29,35], bonus: 24, bonus2: 30 },
+  { round: 291, date: '2018-11-16', main: [1,11,18,19,21,29,37], bonus: 5, bonus2: 15 },
+  { round: 290, date: '2018-11-09', main: [3,13,22,26,31,32,37], bonus: 29, bonus2: 35 },
+  { round: 289, date: '2018-11-02', main: [2,7,10,12,16,17,34], bonus: 23, bonus2: 25 },
+  { round: 288, date: '2018-10-26', main: [1,8,9,16,27,32,37], bonus: 17, bonus2: 31 },
+  { round: 287, date: '2018-10-19', main: [2,7,10,20,24,29,34], bonus: 4, bonus2: 8 },
+  { round: 286, date: '2018-10-12', main: [4,5,14,17,18,29,37], bonus: 27, bonus2: 31 },
+  { round: 285, date: '2018-10-05', main: [11,15,21,26,30,34,35], bonus: 4, bonus2: 36 },
+  { round: 284, date: '2018-09-28', main: [6,7,10,25,29,30,33], bonus: 1, bonus2: 31 },
+  { round: 283, date: '2018-09-21', main: [13,14,15,17,23,29,31], bonus: 10, bonus2: 19 },
+  { round: 282, date: '2018-09-14', main: [10,17,18,25,29,35,36], bonus: 7, bonus2: 14 },
+  { round: 281, date: '2018-09-07', main: [1,2,17,19,20,22,26], bonus: 30, bonus2: 36 },
+  { round: 280, date: '2018-08-31', main: [4,9,10,11,24,32,35], bonus: 2, bonus2: 37 },
+  { round: 279, date: '2018-08-24', main: [7,11,15,17,19,23,31], bonus: 9, bonus2: 37 },
+  { round: 278, date: '2018-08-17', main: [6,9,14,21,23,33,36], bonus: 27, bonus2: 28 },
+  { round: 277, date: '2018-08-10', main: [6,7,9,11,21,23,25], bonus: 1, bonus2: 22 },
+  { round: 276, date: '2018-08-03', main: [3,6,12,17,22,34,35], bonus: 2, bonus2: 33 },
+  { round: 275, date: '2018-07-27', main: [8,9,15,19,24,25,35], bonus: 34, bonus2: 37 },
+  { round: 274, date: '2018-07-20', main: [9,14,21,23,25,26,37], bonus: 7, bonus2: 29 },
+  { round: 273, date: '2018-07-13', main: [13,15,21,23,26,32,34], bonus: 5, bonus2: 9 },
+  { round: 272, date: '2018-07-06', main: [2,5,8,15,18,26,31], bonus: 19, bonus2: 25 },
+  { round: 271, date: '2018-06-29', main: [1,9,15,16,19,32,35], bonus: 14, bonus2: 31 },
+  { round: 270, date: '2018-06-22', main: [1,2,11,13,15,24,25], bonus: 26, bonus2: 28 },
+  { round: 269, date: '2018-06-15', main: [1,9,15,24,31,33,36], bonus: 2, bonus2: 26 },
+  { round: 268, date: '2018-06-08', main: [4,5,9,15,29,31,33], bonus: 26, bonus2: 27 },
+  { round: 267, date: '2018-06-01', main: [8,13,18,20,23,25,26], bonus: 6, bonus2: 28 },
+  { round: 266, date: '2018-05-25', main: [6,11,15,17,20,27,32], bonus: 16, bonus2: 22 },
+  { round: 265, date: '2018-05-18', main: [12,13,15,19,21,24,36], bonus: 10, bonus2: 37 },
+  { round: 264, date: '2018-05-11', main: [8,13,15,17,21,26,29], bonus: 4, bonus2: 24 },
+  { round: 263, date: '2018-05-04', main: [1,5,11,16,27,35,36], bonus: 6, bonus2: 14 },
+  { round: 262, date: '2018-04-27', main: [2,6,7,9,19,23,36], bonus: 5, bonus2: 15 },
+  { round: 261, date: '2018-04-20', main: [4,14,15,17,21,23,26], bonus: 7, bonus2: 8 },
+  { round: 260, date: '2018-04-13', main: [4,8,12,23,29,31,34], bonus: 5, bonus2: 6 },
+  { round: 259, date: '2018-04-06', main: [5,6,15,19,22,29,32], bonus: 4, bonus2: 31 },
+  { round: 258, date: '2018-03-30', main: [1,3,11,20,23,32,35], bonus: 25, bonus2: 26 },
+  { round: 257, date: '2018-03-23', main: [5,15,16,26,27,32,35], bonus: 23, bonus2: 28 },
+  { round: 256, date: '2018-03-16', main: [14,21,24,27,30,33,37], bonus: 19, bonus2: 20 },
+  { round: 255, date: '2018-03-09', main: [1,4,11,13,15,21,32], bonus: 5, bonus2: 10 },
+  { round: 254, date: '2018-03-02', main: [1,12,14,18,23,24,31], bonus: 7, bonus2: 26 },
+  { round: 253, date: '2018-02-23', main: [6,7,9,12,15,17,24], bonus: 26, bonus2: 29 },
+  { round: 252, date: '2018-02-16', main: [8,23,24,25,27,30,31], bonus: 11, bonus2: 17 },
+  { round: 251, date: '2018-02-09', main: [1,15,20,26,28,34,37], bonus: 23, bonus2: 30 },
+  { round: 250, date: '2018-02-02', main: [5,9,10,13,26,30,34], bonus: 18, bonus2: 23 },
+  { round: 249, date: '2018-01-26', main: [9,20,28,29,31,34,37], bonus: 5, bonus2: 25 },
+  { round: 248, date: '2018-01-19', main: [1,5,6,22,25,27,31], bonus: 12, bonus2: 18 },
+  { round: 247, date: '2018-01-12', main: [10,12,13,16,34,35,36], bonus: 11, bonus2: 37 },
+  { round: 246, date: '2018-01-05', main: [3,6,9,19,23,25,31], bonus: 21, bonus2: 36 },
+  { round: 245, date: '2017-12-29', main: [2,8,9,11,24,26,27], bonus: 7, bonus2: 36 },
+  { round: 244, date: '2017-12-22', main: [2,9,17,22,32,34,36], bonus: 11, bonus2: 12 },
+  { round: 243, date: '2017-12-15', main: [6,9,13,18,20,22,30], bonus: 11, bonus2: 14 },
+  { round: 242, date: '2017-12-08', main: [1,5,13,17,31,32,35], bonus: 19, bonus2: 24 },
+  { round: 241, date: '2017-12-01', main: [5,11,12,19,21,26,28], bonus: 4, bonus2: 20 },
+  { round: 240, date: '2017-11-24', main: [9,12,14,24,29,31,35], bonus: 5, bonus2: 30 },
+  { round: 239, date: '2017-11-17', main: [8,13,17,21,23,28,37], bonus: 1, bonus2: 14 },
+  { round: 238, date: '2017-11-10', main: [3,21,26,33,34,35,37], bonus: 23, bonus2: 31 },
+  { round: 237, date: '2017-11-03', main: [3,4,7,19,20,21,29], bonus: 8, bonus2: 33 },
+  { round: 236, date: '2017-10-27', main: [19,22,23,34,35,36,37], bonus: 10, bonus2: 30 },
+  { round: 235, date: '2017-10-20', main: [2,9,13,18,21,33,34], bonus: 3, bonus2: 11 },
+  { round: 234, date: '2017-10-13', main: [7,14,15,16,23,25,30], bonus: 5, bonus2: 34 },
+  { round: 233, date: '2017-10-06', main: [3,13,17,25,26,27,29], bonus: 8, bonus2: 37 },
+  { round: 232, date: '2017-09-29', main: [2,4,7,9,15,35,37], bonus: 10, bonus2: 23 },
+  { round: 231, date: '2017-09-22', main: [4,15,18,24,25,34,36], bonus: 10, bonus2: 26 },
+  { round: 230, date: '2017-09-15', main: [3,5,8,15,22,25,27], bonus: 18, bonus2: 31 },
+  { round: 229, date: '2017-09-08', main: [2,3,9,30,33,36,37], bonus: 1, bonus2: 32 },
+  { round: 228, date: '2017-09-01', main: [6,11,14,21,24,28,31], bonus: 22, bonus2: 36 },
+  { round: 227, date: '2017-08-25', main: [2,3,7,9,22,23,26], bonus: 29, bonus2: 30 },
+  { round: 226, date: '2017-08-18', main: [12,17,21,24,26,30,32], bonus: 10, bonus2: 22 },
+  { round: 225, date: '2017-08-11', main: [13,15,17,18,20,21,26], bonus: 25, bonus2: 29 },
+  { round: 224, date: '2017-08-04', main: [2,4,7,10,12,29,34], bonus: 1, bonus2: 21 },
+  { round: 223, date: '2017-07-28', main: [10,13,19,21,26,33,34], bonus: 24, bonus2: 25 },
+  { round: 222, date: '2017-07-21', main: [3,9,18,21,23,27,29], bonus: 35, bonus2: 37 },
+  { round: 221, date: '2017-07-14', main: [1,2,9,11,17,30,35], bonus: 13, bonus2: 36 },
+  { round: 220, date: '2017-07-07', main: [7,9,11,18,25,28,35], bonus: 20, bonus2: 27 },
+  { round: 219, date: '2017-06-30', main: [6,9,13,14,21,25,31], bonus: 2, bonus2: 4 },
+  { round: 218, date: '2017-06-23', main: [15,16,17,21,26,29,30], bonus: 10, bonus2: 34 },
+  { round: 217, date: '2017-06-16', main: [4,6,26,27,28,35,36], bonus: 24, bonus2: 34 },
+  { round: 216, date: '2017-06-09', main: [9,14,22,24,25,36,37], bonus: 8, bonus2: 28 },
+  { round: 215, date: '2017-06-02', main: [11,12,13,21,29,36,37], bonus: 7, bonus2: 9 },
+  { round: 214, date: '2017-05-26', main: [2,6,9,12,31,36,37], bonus: 3, bonus2: 22 },
+  { round: 213, date: '2017-05-19', main: [5,13,15,18,19,24,35], bonus: 20, bonus2: 23 },
+  { round: 212, date: '2017-05-12', main: [4,6,10,19,20,24,29], bonus: 1, bonus2: 27 },
+  { round: 211, date: '2017-05-05', main: [7,15,22,25,31,32,35], bonus: 29, bonus2: 36 },
+  { round: 210, date: '2017-04-28', main: [2,4,6,11,15,19,36], bonus: 23, bonus2: 34 },
+  { round: 209, date: '2017-04-21', main: [3,4,6,13,22,31,36], bonus: 28, bonus2: 34 },
+  { round: 208, date: '2017-04-14', main: [4,13,16,18,22,26,33], bonus: 27, bonus2: 29 },
+  { round: 207, date: '2017-04-07', main: [4,5,10,13,28,32,33], bonus: 19, bonus2: 26 },
+  { round: 206, date: '2017-03-31', main: [1,6,7,11,27,35,36], bonus: 22, bonus2: 26 },
+  { round: 205, date: '2017-03-24', main: [4,5,19,31,35,36,37], bonus: 27, bonus2: 32 },
+  { round: 204, date: '2017-03-17', main: [5,19,20,21,30,34,36], bonus: 7, bonus2: 12 },
+  { round: 203, date: '2017-03-10', main: [6,13,17,22,32,33,36], bonus: 12, bonus2: 28 },
+  { round: 202, date: '2017-03-03', main: [3,7,11,16,22,34,37], bonus: 29, bonus2: 32 },
+  { round: 201, date: '2017-02-24', main: [8,11,17,24,28,31,32], bonus: 12, bonus2: 34 },
+  { round: 200, date: '2017-02-17', main: [13,14,17,21,27,28,34], bonus: 1, bonus2: 11 },
+  { round: 199, date: '2017-02-10', main: [1,9,17,20,22,28,29], bonus: 13, bonus2: 16 },
+  { round: 198, date: '2017-02-03', main: [18,21,31,32,33,36,37], bonus: 5, bonus2: 25 },
+  { round: 197, date: '2017-01-27', main: [6,8,10,12,16,21,28], bonus: 14, bonus2: 23 },
+  { round: 196, date: '2017-01-20', main: [7,13,15,25,30,32,37], bonus: 8, bonus2: 14 },
+  { round: 195, date: '2017-01-13', main: [4,7,12,20,23,24,31], bonus: 26, bonus2: 35 },
+  { round: 194, date: '2017-01-06', main: [3,6,27,30,31,32,36], bonus: 14, bonus2: 23 },
+  { round: 193, date: '2016-12-30', main: [4,6,20,21,22,24,31], bonus: 9, bonus2: 10 },
+  { round: 192, date: '2016-12-23', main: [12,13,14,19,25,33,34], bonus: 3, bonus2: 22 },
+  { round: 191, date: '2016-12-16', main: [8,15,21,24,26,27,29], bonus: 7, bonus2: 30 },
+  { round: 190, date: '2016-12-09', main: [2,11,12,18,21,33,36], bonus: 8, bonus2: 34 },
+  { round: 189, date: '2016-12-02', main: [3,7,8,10,18,23,35], bonus: 1, bonus2: 19 },
+  { round: 188, date: '2016-11-25', main: [6,15,19,25,26,30,31], bonus: 14, bonus2: 18 },
+  { round: 187, date: '2016-11-18', main: [4,6,10,23,24,32,36], bonus: 15, bonus2: 31 },
+  { round: 186, date: '2016-11-11', main: [5,14,16,19,31,33,37], bonus: 21, bonus2: 28 },
+  { round: 185, date: '2016-11-04', main: [1,2,4,16,26,29,34], bonus: 11, bonus2: 12 },
+  { round: 184, date: '2016-10-28', main: [7,14,18,22,23,26,34], bonus: 2, bonus2: 32 },
+  { round: 183, date: '2016-10-21', main: [6,15,20,26,33,34,37], bonus: 19, bonus2: 29 },
+  { round: 182, date: '2016-10-14', main: [1,7,10,11,20,23,30], bonus: 3, bonus2: 37 },
+  { round: 181, date: '2016-10-07', main: [7,8,10,13,19,23,24], bonus: 15, bonus2: 27 },
+  { round: 180, date: '2016-09-30', main: [1,8,11,21,23,25,28], bonus: 5, bonus2: 37 },
+  { round: 179, date: '2016-09-23', main: [4,9,12,13,22,26,36], bonus: 5, bonus2: 33 },
+  { round: 178, date: '2016-09-16', main: [6,9,11,15,26,34,36], bonus: 13, bonus2: 37 },
+  { round: 177, date: '2016-09-09', main: [9,15,19,23,25,34,36], bonus: 2, bonus2: 35 },
+  { round: 176, date: '2016-09-02', main: [1,11,12,17,22,30,35], bonus: 15, bonus2: 16 },
+  { round: 175, date: '2016-08-26', main: [6,17,21,31,33,35,37], bonus: 14, bonus2: 18 },
+  { round: 174, date: '2016-08-19', main: [10,13,14,15,23,31,32], bonus: 4, bonus2: 29 },
+  { round: 173, date: '2016-08-12', main: [7,9,19,22,24,27,30], bonus: 4, bonus2: 28 },
+  { round: 172, date: '2016-08-05', main: [5,20,21,27,30,31,36], bonus: 9, bonus2: 26 },
+  { round: 171, date: '2016-07-29', main: [1,2,6,21,23,27,28], bonus: 11, bonus2: 16 },
+  { round: 170, date: '2016-07-22', main: [3,5,6,9,27,32,36], bonus: 12, bonus2: 24 },
+  { round: 169, date: '2016-07-15', main: [1,5,10,20,21,28,30], bonus: 25, bonus2: 26 },
+  { round: 168, date: '2016-07-08', main: [3,9,12,14,19,20,36], bonus: 2, bonus2: 5 },
+  { round: 167, date: '2016-07-01', main: [1,3,5,7,10,26,36], bonus: 19, bonus2: 37 },
+  { round: 166, date: '2016-06-24', main: [14,20,27,29,30,31,37], bonus: 23, bonus2: 34 },
+  { round: 165, date: '2016-06-17', main: [9,11,14,15,16,18,27], bonus: 6, bonus2: 20 },
+  { round: 164, date: '2016-06-10', main: [3,13,20,23,31,35,36], bonus: 2, bonus2: 11 },
+  { round: 163, date: '2016-06-03', main: [1,2,6,16,28,30,31], bonus: 3, bonus2: 7 },
+  { round: 162, date: '2016-05-27', main: [2,7,8,12,14,23,27], bonus: 6, bonus2: 10 },
+  { round: 161, date: '2016-05-20', main: [8,14,17,18,20,22,34], bonus: 4, bonus2: 30 },
+  { round: 160, date: '2016-05-13', main: [1,2,8,24,32,36,37], bonus: 23, bonus2: 33 },
+  { round: 159, date: '2016-05-06', main: [10,14,17,21,23,27,31], bonus: 16, bonus2: 24 },
+  { round: 158, date: '2016-04-29', main: [3,6,7,30,32,36,37], bonus: 5, bonus2: 20 },
+  { round: 157, date: '2016-04-22', main: [5,9,16,26,28,29,32], bonus: 1, bonus2: 37 },
+  { round: 156, date: '2016-04-15', main: [4,9,16,19,22,33,34], bonus: 17, bonus2: 36 },
+  { round: 155, date: '2016-04-08', main: [2,9,13,18,22,24,26], bonus: 10, bonus2: 37 },
+  { round: 154, date: '2016-04-01', main: [2,4,19,21,24,28,35], bonus: 3, bonus2: 13 },
+  { round: 153, date: '2016-03-25', main: [7,9,10,16,20,28,37], bonus: 2, bonus2: 33 },
+  { round: 152, date: '2016-03-18', main: [8,12,17,21,23,24,31], bonus: 6, bonus2: 7 },
+  { round: 151, date: '2016-03-11', main: [9,10,13,15,21,22,24], bonus: 4, bonus2: 8 },
+  { round: 150, date: '2016-03-04', main: [6,7,14,20,27,31,34], bonus: 11, bonus2: 24 },
+  { round: 149, date: '2016-02-26', main: [1,4,15,19,22,23,31], bonus: 12, bonus2: 32 },
+  { round: 148, date: '2016-02-19', main: [1,9,11,16,20,30,34], bonus: 12, bonus2: 33 },
+  { round: 147, date: '2016-02-12', main: [1,5,7,12,15,24,25], bonus: 8, bonus2: 14 },
+  { round: 146, date: '2016-02-05', main: [4,10,25,27,28,33,34], bonus: 15, bonus2: 35 },
+  { round: 145, date: '2016-01-29', main: [10,12,18,28,29,30,35], bonus: 4, bonus2: 19 },
+  { round: 144, date: '2016-01-22', main: [2,9,13,18,22,32,36], bonus: 17, bonus2: 26 },
+  { round: 143, date: '2016-01-15', main: [1,3,8,14,28,29,33], bonus: 4, bonus2: 31 },
+  { round: 142, date: '2016-01-08', main: [6,12,14,18,21,27,28], bonus: 1, bonus2: 33 },
+  { round: 141, date: '2015-12-25', main: [2,10,18,30,31,32,36], bonus: 21, bonus2: 29 },
+  { round: 140, date: '2015-12-18', main: [3,11,12,13,17,26,35], bonus: 1, bonus2: 33 },
+  { round: 139, date: '2015-12-11', main: [9,16,18,21,23,34,35], bonus: 4, bonus2: 36 },
+  { round: 138, date: '2015-12-04', main: [2,5,17,20,21,32,33], bonus: 30, bonus2: 35 },
+  { round: 137, date: '2015-11-27', main: [13,19,21,25,27,32,35], bonus: 16, bonus2: 20 },
+  { round: 136, date: '2015-11-20', main: [10,17,24,27,30,33,37], bonus: 18, bonus2: 31 },
+  { round: 135, date: '2015-11-13', main: [8,9,13,14,24,32,34], bonus: 3, bonus2: 4 },
+  { round: 134, date: '2015-11-06', main: [4,9,20,28,30,34,35], bonus: 12, bonus2: 29 },
+  { round: 133, date: '2015-10-30', main: [3,7,13,15,17,21,30], bonus: 14, bonus2: 27 },
+  { round: 132, date: '2015-10-23', main: [7,10,14,16,20,30,31], bonus: 35, bonus2: 37 },
+  { round: 131, date: '2015-10-16', main: [3,4,12,17,32,34,36], bonus: 23, bonus2: 31 },
+  { round: 130, date: '2015-10-09', main: [1,15,20,23,25,31,32], bonus: 5, bonus2: 24 },
+  { round: 129, date: '2015-10-02', main: [5,7,11,19,24,27,30], bonus: 29, bonus2: 35 },
+  { round: 128, date: '2015-09-25', main: [2,4,8,23,26,27,32], bonus: 3, bonus2: 35 },
+  { round: 127, date: '2015-09-18', main: [10,12,15,23,28,30,35], bonus: 6, bonus2: 25 },
+  { round: 126, date: '2015-09-11', main: [4,10,13,16,17,21,27], bonus: 1, bonus2: 18 },
+  { round: 125, date: '2015-09-04', main: [1,6,11,14,19,28,35], bonus: 18, bonus2: 21 },
+  { round: 124, date: '2015-08-28', main: [1,2,15,17,18,22,36], bonus: 6, bonus2: 27 },
+  { round: 123, date: '2015-08-21', main: [1,3,5,8,29,34,36], bonus: 23, bonus2: 28 },
+  { round: 122, date: '2015-08-14', main: [2,16,18,26,27,34,35], bonus: 5, bonus2: 12 },
+  { round: 121, date: '2015-08-07', main: [2,4,13,16,21,30,37], bonus: 19, bonus2: 29 },
+  { round: 120, date: '2015-07-31', main: [2,16,18,26,32,35,37], bonus: 9, bonus2: 36 },
+  { round: 119, date: '2015-07-24', main: [3,6,8,14,15,25,36], bonus: 24, bonus2: 35 },
+  { round: 118, date: '2015-07-17', main: [5,8,9,24,27,28,30], bonus: 16, bonus2: 20 },
+  { round: 117, date: '2015-07-10', main: [9,10,20,28,31,34,37], bonus: 23, bonus2: 26 },
+  { round: 116, date: '2015-07-03', main: [9,14,23,27,28,31,32], bonus: 3, bonus2: 20 },
+  { round: 115, date: '2015-06-26', main: [6,8,13,14,20,25,27], bonus: 24, bonus2: 26 },
+  { round: 114, date: '2015-06-19', main: [8,13,26,27,28,29,37], bonus: 4, bonus2: 12 },
+  { round: 113, date: '2015-06-12', main: [4,6,7,9,15,17,37], bonus: 14, bonus2: 20 },
+  { round: 112, date: '2015-06-05', main: [6,7,10,15,27,35,36], bonus: 13, bonus2: 20 },
+  { round: 111, date: '2015-05-29', main: [7,8,9,24,28,30,33], bonus: 1, bonus2: 34 },
+  { round: 110, date: '2015-05-22', main: [4,12,22,30,31,35,36], bonus: 19, bonus2: 37 },
+  { round: 109, date: '2015-05-15', main: [6,17,20,21,24,30,32], bonus: 7, bonus2: 23 },
+  { round: 108, date: '2015-05-08', main: [2,6,7,8,28,30,36], bonus: 18, bonus2: 21 },
+  { round: 107, date: '2015-05-01', main: [3,8,9,13,17,27,33], bonus: 29, bonus2: 31 },
+  { round: 106, date: '2015-04-24', main: [6,10,12,19,21,22,30], bonus: 1, bonus2: 11 },
+  { round: 105, date: '2015-04-17', main: [3,15,19,20,26,28,33], bonus: 17, bonus2: 21 },
+  { round: 104, date: '2015-04-10', main: [7,9,11,15,16,22,37], bonus: 12, bonus2: 13 },
+  { round: 103, date: '2015-04-03', main: [2,3,11,12,22,35,36], bonus: 30, bonus2: 34 },
+  { round: 102, date: '2015-03-27', main: [1,4,8,27,28,29,31], bonus: 13, bonus2: 25 },
+  { round: 101, date: '2015-03-20', main: [11,12,21,23,28,36,37], bonus: 3, bonus2: 16 },
+  { round: 100, date: '2015-03-13', main: [1,2,11,16,25,35,36], bonus: 9, bonus2: 14 },
+  { round: 99, date: '2015-03-06', main: [13,17,22,24,27,28,35], bonus: 11, bonus2: 19 },
+  { round: 98, date: '2015-02-27', main: [3,9,11,13,19,25,33], bonus: 10, bonus2: 30 },
+  { round: 97, date: '2015-02-20', main: [7,13,14,16,22,24,35], bonus: 1, bonus2: 29 },
+  { round: 96, date: '2015-02-13', main: [9,11,14,21,22,23,24], bonus: 10, bonus2: 36 },
+  { round: 95, date: '2015-02-06', main: [1,8,13,14,18,30,34], bonus: 26, bonus2: 36 },
+  { round: 94, date: '2015-01-30', main: [13,19,20,27,28,29,30], bonus: 26, bonus2: 36 },
+  { round: 93, date: '2015-01-23', main: [2,5,11,14,17,30,32], bonus: 31, bonus2: 37 },
+  { round: 92, date: '2015-01-16', main: [4,5,15,25,26,29,32], bonus: 11, bonus2: 27 },
+  { round: 91, date: '2015-01-09', main: [1,5,7,14,15,25,35], bonus: 18, bonus2: 24 },
+  { round: 90, date: '2014-12-26', main: [2,8,9,13,14,18,37], bonus: 11, bonus2: 25 },
+  { round: 89, date: '2014-12-19', main: [1,3,11,26,28,34,36], bonus: 17, bonus2: 20 },
+  { round: 88, date: '2014-12-12', main: [3,4,10,14,25,29,30], bonus: 18, bonus2: 19 },
+  { round: 87, date: '2014-12-05', main: [8,9,12,18,20,28,31], bonus: 13, bonus2: 15 },
+  { round: 86, date: '2014-11-28', main: [3,10,20,21,22,26,30], bonus: 24, bonus2: 35 },
+  { round: 85, date: '2014-11-21', main: [6,7,10,11,22,26,35], bonus: 14, bonus2: 23 },
+  { round: 84, date: '2014-11-14', main: [8,16,23,28,29,35,36], bonus: 12, bonus2: 37 },
+  { round: 83, date: '2014-11-07', main: [1,11,21,26,28,32,35], bonus: 18, bonus2: 22 },
+  { round: 82, date: '2014-10-31', main: [1,3,16,20,25,27,34], bonus: 18, bonus2: 37 },
+  { round: 81, date: '2014-10-24', main: [1,3,10,18,28,31,35], bonus: 9, bonus2: 21 },
+  { round: 80, date: '2014-10-17', main: [2,5,10,18,21,24,27], bonus: 25, bonus2: 34 },
+  { round: 79, date: '2014-10-10', main: [2,4,7,9,21,29,37], bonus: 6, bonus2: 36 },
+  { round: 78, date: '2014-10-03', main: [5,6,10,14,24,28,36], bonus: 7, bonus2: 20 },
+  { round: 77, date: '2014-09-26', main: [3,10,23,25,26,28,30], bonus: 15, bonus2: 29 },
+  { round: 76, date: '2014-09-19', main: [4,13,18,29,32,34,36], bonus: 24, bonus2: 33 },
+  { round: 75, date: '2014-09-12', main: [4,9,15,17,19,35,37], bonus: 10, bonus2: 20 },
+  { round: 74, date: '2014-09-05', main: [5,13,14,15,16,24,31], bonus: 9, bonus2: 11 },
+  { round: 73, date: '2014-08-29', main: [12,16,23,25,27,30,32], bonus: 28, bonus2: 33 },
+  { round: 72, date: '2014-08-22', main: [11,12,18,19,20,31,32], bonus: 9, bonus2: 21 },
+  { round: 71, date: '2014-08-15', main: [1,6,13,29,34,35,37], bonus: 2, bonus2: 15 },
+  { round: 70, date: '2014-08-08', main: [9,10,18,21,27,33,35], bonus: 4, bonus2: 11 },
+  { round: 69, date: '2014-08-01', main: [13,17,20,22,28,29,37], bonus: 11, bonus2: 12 },
+  { round: 68, date: '2014-07-25', main: [2,7,13,15,24,34,35], bonus: 12, bonus2: 23 },
+  { round: 67, date: '2014-07-18', main: [7,11,15,17,18,25,35], bonus: 6, bonus2: 33 },
+  { round: 66, date: '2014-07-11', main: [1,11,25,28,31,33,37], bonus: 3, bonus2: 20 },
+  { round: 65, date: '2014-07-04', main: [4,7,12,22,23,24,28], bonus: 25, bonus2: 34 },
+  { round: 64, date: '2014-06-27', main: [4,15,16,17,20,29,36], bonus: 19, bonus2: 26 },
+  { round: 63, date: '2014-06-20', main: [4,8,19,24,28,30,32], bonus: 12, bonus2: 37 },
+  { round: 62, date: '2014-06-13', main: [4,10,12,15,27,32,33], bonus: 9, bonus2: 16 },
+  { round: 61, date: '2014-06-06', main: [5,10,11,21,28,31,37], bonus: 13, bonus2: 14 },
+  { round: 60, date: '2014-05-30', main: [3,7,9,15,16,23,34], bonus: 5, bonus2: 33 },
+  { round: 59, date: '2014-05-23', main: [5,8,12,13,21,30,35], bonus: 27, bonus2: 34 },
+  { round: 58, date: '2014-05-16', main: [1,6,7,8,23,32,33], bonus: 11, bonus2: 34 },
+  { round: 57, date: '2014-05-09', main: [5,6,12,16,17,20,33], bonus: 8, bonus2: 32 },
+  { round: 56, date: '2014-05-02', main: [4,23,26,27,28,32,36], bonus: 29, bonus2: 30 },
+  { round: 55, date: '2014-04-25', main: [4,12,14,17,23,30,36], bonus: 13, bonus2: 33 },
+  { round: 54, date: '2014-04-18', main: [1,3,5,10,18,22,23], bonus: 7, bonus2: 35 },
+  { round: 53, date: '2014-04-11', main: [1,4,14,16,20,33,36], bonus: 12, bonus2: 30 },
+  { round: 52, date: '2014-04-04', main: [8,10,22,24,26,32,34], bonus: 5, bonus2: 9 },
+  { round: 51, date: '2014-03-28', main: [1,4,5,8,20,23,35], bonus: 15, bonus2: 33 },
+  { round: 50, date: '2014-03-21', main: [3,4,7,8,15,24,29], bonus: 11, bonus2: 16 },
+  { round: 49, date: '2014-03-14', main: [8,11,12,17,24,26,27], bonus: 14, bonus2: 21 },
+  { round: 48, date: '2014-03-07', main: [3,5,24,26,29,30,34], bonus: 8, bonus2: 35 },
+  { round: 47, date: '2014-02-28', main: [2,9,11,14,20,21,36], bonus: 6, bonus2: 15 },
+  { round: 46, date: '2014-02-21', main: [2,5,6,15,23,27,30], bonus: 4, bonus2: 35 },
+  { round: 45, date: '2014-02-14', main: [1,2,9,18,21,27,33], bonus: 25, bonus2: 31 },
+  { round: 44, date: '2014-02-07', main: [3,4,6,15,27,28,29], bonus: 1, bonus2: 14 },
+  { round: 43, date: '2014-01-31', main: [4,6,7,8,24,31,37], bonus: 5, bonus2: 13 },
+  { round: 42, date: '2014-01-24', main: [2,15,16,17,23,31,33], bonus: 8, bonus2: 26 },
+  { round: 41, date: '2014-01-17', main: [2,3,8,15,34,35,36], bonus: 25, bonus2: 28 },
+  { round: 40, date: '2014-01-10', main: [2,6,11,23,26,31,34], bonus: 7, bonus2: 20 },
+  { round: 39, date: '2013-12-27', main: [7,13,19,23,25,26,30], bonus: 1, bonus2: 18 },
+  { round: 38, date: '2013-12-20', main: [4,14,19,22,24,29,34], bonus: 8, bonus2: 31 },
+  { round: 37, date: '2013-12-13', main: [7,8,10,13,14,19,37], bonus: 29, bonus2: 33 },
+  { round: 36, date: '2013-12-06', main: [5,6,10,11,20,28,36], bonus: 25, bonus2: 37 },
+  { round: 35, date: '2013-11-29', main: [1,16,18,19,25,30,34], bonus: 26, bonus2: 36 },
+  { round: 34, date: '2013-11-22', main: [4,6,7,23,24,32,35], bonus: 8, bonus2: 27 },
+  { round: 33, date: '2013-11-15', main: [1,4,17,24,29,33,36], bonus: 19, bonus2: 30 },
+  { round: 32, date: '2013-11-08', main: [3,8,15,18,27,29,37], bonus: 31, bonus2: 34 },
+  { round: 31, date: '2013-11-01', main: [9,12,13,19,23,33,34], bonus: 20, bonus2: 32 },
+  { round: 30, date: '2013-10-25', main: [6,8,13,22,26,32,36], bonus: 16, bonus2: 34 },
+  { round: 29, date: '2013-10-18', main: [2,3,16,17,24,26,28], bonus: 15, bonus2: 31 },
+  { round: 28, date: '2013-10-11', main: [6,7,12,15,19,35,37], bonus: 1, bonus2: 11 },
+  { round: 27, date: '2013-10-04', main: [1,10,11,14,17,18,28], bonus: 25, bonus2: 26 },
+  { round: 26, date: '2013-09-27', main: [11,13,16,18,26,31,36], bonus: 21, bonus2: 27 },
+  { round: 25, date: '2013-09-20', main: [1,6,11,16,17,18,21], bonus: 10, bonus2: 24 },
+  { round: 24, date: '2013-09-13', main: [4,5,8,10,16,19,33], bonus: 2, bonus2: 29 },
+  { round: 23, date: '2013-09-06', main: [4,8,11,25,28,29,30], bonus: 14, bonus2: 32 },
+  { round: 22, date: '2013-08-30', main: [2,4,8,9,15,23,25], bonus: 3, bonus2: 10 },
+  { round: 21, date: '2013-08-23', main: [1,9,13,15,25,30,33], bonus: 19, bonus2: 28 },
+  { round: 20, date: '2013-08-16', main: [2,5,13,20,21,23,28], bonus: 11, bonus2: 22 },
+  { round: 19, date: '2013-08-09', main: [2,14,19,20,21,22,31], bonus: 1, bonus2: 15 },
+  { round: 18, date: '2013-08-02', main: [12,17,21,24,29,31,36], bonus: 20, bonus2: 26 },
+  { round: 17, date: '2013-07-26', main: [2,3,5,22,34,36,37], bonus: 7, bonus2: 15 },
+  { round: 16, date: '2013-07-19', main: [5,6,9,13,16,21,23], bonus: 8, bonus2: 34 },
+  { round: 15, date: '2013-07-12', main: [2,10,14,17,23,25,35], bonus: 8, bonus2: 29 },
+  { round: 14, date: '2013-07-05', main: [4,7,8,9,24,28,30], bonus: 34, bonus2: 36 },
+  { round: 13, date: '2013-06-28', main: [6,10,16,21,27,28,35], bonus: 15, bonus2: 34 },
+  { round: 12, date: '2013-06-21', main: [11,12,14,19,26,27,33], bonus: 24, bonus2: 32 },
+  { round: 11, date: '2013-06-14', main: [9,15,26,29,32,34,36], bonus: 14, bonus2: 35 },
+  { round: 10, date: '2013-06-07', main: [1,2,3,6,24,28,30], bonus: 16, bonus2: 20 },
+  { round: 9, date: '2013-05-31', main: [3,4,15,23,27,30,36], bonus: 13, bonus2: 35 },
+  { round: 8, date: '2013-05-24', main: [2,21,28,29,30,32,36], bonus: 6, bonus2: 8 },
+  { round: 7, date: '2013-05-17', main: [1,3,5,7,27,29,33], bonus: 6, bonus2: 15 },
+  { round: 6, date: '2013-05-10', main: [5,15,19,23,30,34,35], bonus: 6, bonus2: 25 },
+  { round: 5, date: '2013-05-03', main: [1,3,4,5,16,21,28], bonus: 22, bonus2: 31 },
+  { round: 4, date: '2013-04-26', main: [12,13,22,23,24,28,29], bonus: 2, bonus2: 14 },
+  { round: 3, date: '2013-04-19', main: [2,7,8,11,14,23,31], bonus: 5, bonus2: 15 },
+  { round: 2, date: '2013-04-12', main: [20,24,29,31,33,34,35], bonus: 12, bonus2: 32 },
+  { round: 1, date: '2013-04-05', main: [7,10,12,17,23,28,34], bonus: 3, bonus2: 15 },
+];
+
 // ─── Storage ─────────────────────────────────────────────────────────────────
 function saveHistory() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+  localStorage.setItem(config.storageKey, JSON.stringify(history));
 }
 
 function loadHistory() {
-  const data = localStorage.getItem(STORAGE_KEY);
+  const data = localStorage.getItem(config.storageKey);
   if (data) {
     try { history = JSON.parse(data); } catch { history = []; }
   }
@@ -634,7 +1377,7 @@ function loadHistory() {
 
 // ─── Frequency analysis ───────────────────────────────────────────────────────
 function computeFrequency(data = history, includeBonus = false) {
-  const freq = new Array(44).fill(0); // index 1-43
+  const freq = new Array(config.maxNum + 1).fill(0);
   data.forEach(entry => {
     entry.main.forEach(n => freq[n]++);
     if (includeBonus && entry.bonus) freq[entry.bonus]++;
@@ -643,14 +1386,14 @@ function computeFrequency(data = history, includeBonus = false) {
 }
 
 function getRanked(freq) {
-  return Array.from({ length: 43 }, (_, i) => ({ num: i + 1, count: freq[i + 1] }))
+  return Array.from({ length: config.maxNum }, (_, i) => ({ num: i + 1, count: freq[i + 1] }))
     .sort((a, b) => b.count - a.count);
 }
 
 // ─── Interval analysis ────────────────────────────────────────────────────────
 function computeIntervalStats() {
   const result = {};
-  for (let n = 1; n <= 43; n++) {
+  for (let n = 1; n <= config.maxNum; n++) {
     const appearances = [];
     history.forEach((entry, idx) => {
       if (entry.main.includes(n)) appearances.push(idx);
@@ -677,7 +1420,8 @@ function computeIntervalStats() {
 
 // ─── Co-occurrence analysis ───────────────────────────────────────────────────
 function computeCoOccurrence() {
-  const matrix = Array.from({ length: 44 }, () => new Array(44).fill(0));
+  const sz = config.maxNum + 1;
+  const matrix = Array.from({ length: sz }, () => new Array(sz).fill(0));
   history.forEach(entry => {
     const m = entry.main;
     for (let i = 0; i < m.length; i++) {
@@ -691,23 +1435,17 @@ function computeCoOccurrence() {
 }
 
 // ─── Zone analysis ────────────────────────────────────────────────────────────
-const ZONES = [
-  { label: '1〜10', min: 1, max: 10, size: 10 },
-  { label: '11〜20', min: 11, max: 20, size: 10 },
-  { label: '21〜30', min: 21, max: 30, size: 10 },
-  { label: '31〜43', min: 31, max: 43, size: 13 }
-];
-
 function computeZoneStats() {
   const n = history.length;
-  if (n === 0) return ZONES.map(z => ({ ...z, actual: 0, expected: 0, ratio: 1 }));
-  return ZONES.map(zone => {
+  const zones = config.zones;
+  if (n === 0) return zones.map(z => ({ ...z, actual: 0, expected: 0, ratio: 1 }));
+  return zones.map(zone => {
     let count = 0;
     history.forEach(entry => {
       entry.main.forEach(num => { if (num >= zone.min && num <= zone.max) count++; });
     });
     const actualAvg = count / n;
-    const expectedAvg = 6 * zone.size / 43;
+    const expectedAvg = config.pickCount * zone.size / config.maxNum;
     return { ...zone, actual: actualAvg, expected: expectedAvg, ratio: actualAvg / expectedAvg };
   });
 }
@@ -716,7 +1454,8 @@ function computeZoneStats() {
 function pickRandom6(pool) {
   const arr = [...pool];
   const result = [];
-  while (result.length < 6) {
+  const n = Math.min(config.pickCount, arr.length);
+  while (result.length < n) {
     const idx = Math.floor(Math.random() * arr.length);
     result.push(arr.splice(idx, 1)[0]);
   }
@@ -724,55 +1463,61 @@ function pickRandom6(pool) {
 }
 
 function pickBonus(main) {
-  let b;
-  do { b = Math.floor(Math.random() * 43) + 1; } while (main.includes(b));
-  return b;
+  const bonuses = [];
+  while (bonuses.length < config.bonusCount) {
+    let b;
+    do { b = Math.floor(Math.random() * config.maxNum) + 1; }
+    while (main.includes(b) || bonuses.includes(b));
+    bonuses.push(b);
+  }
+  return bonuses; // always array
 }
 
 function predictHot(freq) {
   const ranked = getRanked(freq);
-  const top = ranked.slice(0, 15).map(r => r.num);
+  const top = ranked.slice(0, Math.min(15, ranked.length)).map(r => r.num);
   return pickRandom6(top);
 }
 
 function predictCold(freq) {
   const ranked = getRanked(freq).reverse();
-  const bottom = ranked.slice(0, 15).map(r => r.num);
+  const bottom = ranked.slice(0, Math.min(15, ranked.length)).map(r => r.num);
   return pickRandom6(bottom);
 }
 
 function predictBalanced(freq) {
   const ranked = getRanked(freq);
+  const half = Math.ceil(config.pickCount / 2);
   const hot = ranked.slice(0, 10).map(r => r.num);
   const cold = ranked.slice(-10).map(r => r.num);
-  const hot3 = pickRandom6(hot).slice(0, 3);
-  const cold3Pool = cold.filter(n => !hot3.includes(n));
-  const cold3 = pickRandom6(cold3Pool).slice(0, 3);
-  return [...hot3, ...cold3].sort((a, b) => a - b);
+  const hotPicks = pickRandom6(hot).slice(0, half);
+  const coldPool = cold.filter(n => !hotPicks.includes(n));
+  const coldPicks = pickRandom6(coldPool).slice(0, config.pickCount - half);
+  return [...hotPicks, ...coldPicks].sort((a, b) => a - b);
 }
 
 function predictWeighted(freq) {
   const total = freq.reduce((s, v) => s + v, 0);
   const pick = () => {
     let r = Math.random() * total;
-    for (let i = 1; i <= 43; i++) {
+    for (let i = 1; i <= config.maxNum; i++) {
       r -= freq[i];
       if (r <= 0) return i;
     }
-    return 43;
+    return config.maxNum;
   };
   const result = new Set();
-  while (result.size < 6) result.add(pick());
+  while (result.size < config.pickCount) result.add(pick());
   return Array.from(result).sort((a, b) => a - b);
 }
 
 function predictRandom() {
-  const pool = Array.from({ length: 43 }, (_, i) => i + 1);
+  const pool = Array.from({ length: config.maxNum }, (_, i) => i + 1);
   return pickRandom6(pool);
 }
 
 function predictByInterval(intervalStats) {
-  const scored = Array.from({ length: 43 }, (_, i) => ({
+  const scored = Array.from({ length: config.maxNum }, (_, i) => ({
     num: i + 1,
     score: intervalStats[i + 1] ? intervalStats[i + 1].duenessScore : 0
   })).sort((a, b) => b.score - a.score);
@@ -784,7 +1529,7 @@ function predictByInterval(intervalStats) {
     return top20[0].num;
   };
   const result = new Set();
-  while (result.size < 6) result.add(pick());
+  while (result.size < config.pickCount) result.add(pick());
   return Array.from(result).sort((a, b) => a - b);
 }
 
@@ -793,8 +1538,8 @@ function predictByCoOccurrence(matrix, freq) {
   const top10 = ranked.slice(0, 10).map(r => r.num);
   const seed = top10[Math.floor(Math.random() * top10.length)];
   const result = [seed];
-  const all = Array.from({ length: 43 }, (_, i) => i + 1);
-  while (result.length < 6) {
+  const all = Array.from({ length: config.maxNum }, (_, i) => i + 1);
+  while (result.length < config.pickCount) {
     const candidates = all.filter(n => !result.includes(n));
     candidates.sort((a, b) => {
       const sB = result.reduce((s, r) => s + matrix[r][b], 0);
@@ -809,16 +1554,16 @@ function predictByCoOccurrence(matrix, freq) {
 function predictByZoneBalance(zoneStats, freq) {
   const weights = zoneStats.map(z => z.ratio > 0 ? 1 / z.ratio : 2);
   const totalW = weights.reduce((s, v) => s + v, 0);
-  const rawAlloc = weights.map(w => (w / totalW) * 6);
+  const rawAlloc = weights.map(w => (w / totalW) * config.pickCount);
   const alloc = rawAlloc.map(v => Math.floor(v));
-  const remainder = 6 - alloc.reduce((s, v) => s + v, 0);
+  const remainder = config.pickCount - alloc.reduce((s, v) => s + v, 0);
   rawAlloc.map((v, i) => ({ i, frac: v - Math.floor(v) }))
     .sort((a, b) => b.frac - a.frac)
     .slice(0, remainder)
     .forEach(f => alloc[f.i]++);
   const result = [];
   const used = new Set();
-  ZONES.forEach((zone, zi) => {
+  config.zones.forEach((zone, zi) => {
     const pool = [];
     for (let n = zone.min; n <= zone.max; n++) pool.push({ num: n, count: freq[n] });
     pool.sort((a, b) => b.count - a.count);
@@ -834,24 +1579,24 @@ function predictByZoneBalance(zoneStats, freq) {
       used.add(chosen);
     }
   });
-  if (result.length < 6) {
-    Array.from({ length: 43 }, (_, i) => i + 1)
+  if (result.length < config.pickCount) {
+    Array.from({ length: config.maxNum }, (_, i) => i + 1)
       .filter(n => !used.has(n))
       .sort((a, b) => freq[b] - freq[a])
-      .slice(0, 6 - result.length)
+      .slice(0, config.pickCount - result.length)
       .forEach(n => result.push(n));
   }
   return result.sort((a, b) => a - b);
 }
 
 function predictComposite(freq, intervalStats, matrix) {
-  const freqVals = Array.from({ length: 43 }, (_, i) => freq[i + 1]);
+  const freqVals = Array.from({ length: config.maxNum }, (_, i) => freq[i + 1]);
   const freqMax = Math.max(...freqVals);
   const freqMin = Math.min(...freqVals);
-  const coSums = Array.from({ length: 44 }, (_, n) => n === 0 ? 0 : matrix[n].reduce((s, v) => s + v, 0));
+  const coSums = Array.from({ length: config.maxNum + 1 }, (_, n) => n === 0 ? 0 : matrix[n].reduce((s, v) => s + v, 0));
   const coMax = Math.max(...coSums.slice(1));
   const coMin = Math.min(...coSums.slice(1));
-  const scored = Array.from({ length: 43 }, (_, i) => {
+  const scored = Array.from({ length: config.maxNum }, (_, i) => {
     const n = i + 1;
     const freqScore = freqMax > freqMin ? (freq[n] - freqMin) / (freqMax - freqMin) * 100 : 50;
     const dueness = intervalStats[n] ? intervalStats[n].duenessScore : 50;
@@ -866,13 +1611,19 @@ function predictComposite(freq, intervalStats, matrix) {
     return top20[0].num;
   };
   const result = new Set();
-  while (result.size < 6) result.add(pick());
+  while (result.size < config.pickCount) result.add(pick());
   return Array.from(result).sort((a, b) => a - b);
+}
+
+function makePredictionResult(main, note) {
+  const bonuses = pickBonus(main);
+  return { main, bonus: bonuses[0], bonus2: bonuses[1] || null, note };
 }
 
 function generatePrediction(method) {
   if (history.length === 0) {
-    return { main: predictRandom(), bonus: pickBonus([]), note: 'データがないためランダム生成しました。' };
+    const main = predictRandom();
+    return makePredictionResult(main, 'データがないためランダム生成しました。');
   }
   const freq = computeFrequency();
   let main;
@@ -923,7 +1674,7 @@ function generatePrediction(method) {
       main = predictRandom();
       note = '完全ランダムで生成しました。';
   }
-  return { main, bonus: pickBonus(main), note };
+  return makePredictionResult(main, note);
 }
 
 // ─── Render helpers ───────────────────────────────────────────────────────────
@@ -938,7 +1689,10 @@ function renderPrediction(result, container, bonusEl, noteEl) {
   container.innerHTML = '';
   result.main.forEach(n => container.appendChild(createBall(n)));
   container.appendChild(createBall(result.bonus, true));
-  if (bonusEl) bonusEl.textContent = `ボーナス数字: ${result.bonus}`;
+  if (result.bonus2) container.appendChild(createBall(result.bonus2, true));
+  if (bonusEl) bonusEl.textContent = result.bonus2
+    ? `ボーナス数字: ${result.bonus} / ${result.bonus2}`
+    : `ボーナス数字: ${result.bonus}`;
   if (noteEl) noteEl.textContent = result.note || '';
 }
 
@@ -970,7 +1724,7 @@ function renderStats() {
   const ranked = getRanked(freq);
   const maxNum = ranked[0];
   const minNum = ranked[ranked.length - 1];
-  const avgFreq = (ranked.reduce((s, r) => s + r.count, 0) / 43).toFixed(1);
+  const avgFreq = (ranked.reduce((s, r) => s + r.count, 0) / config.maxNum).toFixed(1);
   const grid = document.getElementById('stats-grid');
   grid.innerHTML = `
     <div class="stat-card"><div class="stat-value">${history.length}</div><div class="stat-label">総データ数</div></div>
@@ -982,7 +1736,7 @@ function renderStats() {
 
 function renderCharts() {
   if (history.length === 0) return;
-  const labels = Array.from({ length: 43 }, (_, i) => i + 1);
+  const labels = Array.from({ length: config.maxNum }, (_, i) => i + 1);
   const freq = computeFrequency();
   const data = labels.map(i => freq[i]);
 
@@ -1053,6 +1807,7 @@ function renderHistory() {
     balls.className = 'balls-container';
     entry.main.forEach(n => balls.appendChild(createBall(n, false, true)));
     balls.appendChild(createBall(entry.bonus, true, true));
+    if (entry.bonus2) balls.appendChild(createBall(entry.bonus2, true, true));
     const removeBtn = document.createElement('button');
     removeBtn.className = 'btn-remove';
     removeBtn.textContent = '✕';
@@ -1066,7 +1821,7 @@ function renderIntervalAnalysis() {
   const el = document.getElementById('interval-analysis');
   if (!el || history.length === 0) return;
   const stats = computeIntervalStats();
-  const sorted = Array.from({ length: 43 }, (_, i) => ({ num: i + 1, ...stats[i + 1] }))
+  const sorted = Array.from({ length: config.maxNum }, (_, i) => ({ num: i + 1, ...stats[i + 1] }))
     .sort((a, b) => b.duenessScore - a.duenessScore);
   el.innerHTML = sorted.slice(0, 20).map(s => `
     <div class="interval-row">
@@ -1086,8 +1841,8 @@ function renderCoOccurrenceAnalysis() {
   if (!el || history.length === 0) return;
   const matrix = computeCoOccurrence();
   const pairs = [];
-  for (let i = 1; i <= 43; i++) {
-    for (let j = i + 1; j <= 43; j++) {
+  for (let i = 1; i <= config.maxNum; i++) {
+    for (let j = i + 1; j <= config.maxNum; j++) {
       if (matrix[i][j] > 0) pairs.push({ a: i, b: j, count: matrix[i][j] });
     }
   }
@@ -1177,6 +1932,7 @@ document.getElementById('btn-multi-predict').addEventListener('click', () => {
     balls.className = 'balls-container';
     result.main.forEach(n => balls.appendChild(createBall(n, false, true)));
     balls.appendChild(createBall(result.bonus, true, true));
+    if (result.bonus2) balls.appendChild(createBall(result.bonus2, true, true));
     row.append(label, balls);
     container.appendChild(row);
   }
@@ -1190,23 +1946,23 @@ document.getElementById('btn-add').addEventListener('click', () => {
   const mains = Array.from(inputs).map(i => parseInt(i.value)).filter(v => !isNaN(v));
   const bonus = parseInt(bonusInput.value);
 
-  if (mains.length !== 6) {
-    errorEl.textContent = '本数字を6つ入力してください。';
+  if (mains.length !== config.pickCount) {
+    errorEl.textContent = `本数字を${config.pickCount}つ入力してください。`;
     errorEl.classList.remove('hidden');
     return;
   }
-  if (mains.some(n => n < 1 || n > 43)) {
-    errorEl.textContent = '本数字は1〜43の範囲で入力してください。';
+  if (mains.some(n => n < 1 || n > config.maxNum)) {
+    errorEl.textContent = `本数字は1〜${config.maxNum}の範囲で入力してください。`;
     errorEl.classList.remove('hidden');
     return;
   }
-  if (new Set(mains).size !== 6) {
+  if (new Set(mains).size !== config.pickCount) {
     errorEl.textContent = '本数字に重複があります。';
     errorEl.classList.remove('hidden');
     return;
   }
-  if (isNaN(bonus) || bonus < 1 || bonus > 43 || mains.includes(bonus)) {
-    errorEl.textContent = 'ボーナス数字は1〜43の範囲（本数字と重複不可）で入力してください。';
+  if (isNaN(bonus) || bonus < 1 || bonus > config.maxNum || mains.includes(bonus)) {
+    errorEl.textContent = `ボーナス数字は1〜${config.maxNum}の範囲（本数字と重複不可）で入力してください。`;
     errorEl.classList.remove('hidden');
     return;
   }
@@ -1234,8 +1990,9 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 
 document.getElementById('btn-load-sample').addEventListener('click', () => {
   if (history.length > 0 && !confirm('既存データにサンプルデータを追加しますか？')) return;
+  const sampleData = currentGame === 'loto7' ? LOTO7_SAMPLE_DATA : SAMPLE_DATA;
   const existing = new Set(history.map(h => h.round));
-  SAMPLE_DATA.forEach(d => { if (!existing.has(d.round)) history.unshift(d); });
+  sampleData.forEach(d => { if (!existing.has(d.round)) history.unshift(d); });
   history.sort((a, b) => (b.round || 0) - (a.round || 0));
   saveHistory();
   refreshAll();
@@ -1243,17 +2000,45 @@ document.getElementById('btn-load-sample').addEventListener('click', () => {
 
 document.getElementById('btn-export').addEventListener('click', () => {
   const header = '回次,日付,数字1,数字2,数字3,数字4,数字5,数字6,ボーナス\n';
-  const rows = history.map(h =>
-    [h.round || '', h.date || '', ...h.main, h.bonus].join(',')
-  ).join('\n');
+  const rows = history.map(h => {
+    const bonusParts = h.bonus2 ? [h.bonus, h.bonus2] : [h.bonus];
+    return [h.round || '', h.date || '', ...h.main, ...bonusParts].join(',');
+  }).join('\n');
   const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'loto6_history.csv';
+  a.download = `${config.name.replace(' ', '')}_history.csv`;
   a.click();
+});
+
+// ─── Game switching ───────────────────────────────────────────────────────────
+function switchGame(gameKey) {
+  if (gameKey === currentGame) return;
+  currentGame = gameKey;
+  config = GAME_CONFIG[gameKey];
+  history = [];
+  loadHistory();
+  document.querySelectorAll('.game-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.game === gameKey);
+  });
+  document.getElementById('game-label').textContent = config.name;
+  // Update number input count for manual entry
+  const mainInputs = document.getElementById('main-inputs');
+  mainInputs.innerHTML = Array.from({ length: config.pickCount }, () =>
+    `<input type="number" class="num-input" min="1" max="${config.maxNum}" placeholder="1〜${config.maxNum}">`
+  ).join('');
+  const lbl = document.getElementById('main-input-label');
+  if (lbl) lbl.textContent = `本数字 (${config.pickCount}つ、1〜${config.maxNum})`;
+  // Clear prediction result
+  document.getElementById('prediction-result').classList.add('hidden');
+  document.getElementById('multi-prediction-result').innerHTML = '';
+  refreshAll();
+}
+
+document.querySelectorAll('.game-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchGame(btn.dataset.game));
 });
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 loadHistory();
-refreshAll();
 refreshAll();
