@@ -10,8 +10,12 @@
 <body>
   <div id="app">
     <header>
-      <h1>🎰 ロト6 予測アプリ</h1>
+      <h1>🎰 <span id="game-label">ロト6</span> 予測アプリ</h1>
       <p class="subtitle">過去データの分析から次回の当選番号を予測</p>
+      <div class="game-selector">
+        <button class="game-btn active" data-game="loto6">ロト6</button>
+        <button class="game-btn" data-game="loto7">ロト7</button>
+      </div>
     </header>
 
     <nav class="tabs">
@@ -123,7 +127,7 @@
             <input type="date" id="input-date">
           </div>
           <div class="input-row">
-            <label>本数字 (6つ、1〜43)</label>
+            <label id="main-input-label">本数字 (6つ、1〜43)</label>
             <div class="number-inputs" id="main-inputs">
               <input type="number" class="num-input" min="1" max="43" placeholder="1〜43">
               <input type="number" class="num-input" min="1" max="43" placeholder="1〜43">
