@@ -48,6 +48,39 @@ header h1 {
   font-size: 0.9rem;
 }
 
+/* Game selector */
+.game-selector {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.game-btn {
+  padding: 8px 28px;
+  border: 2px solid var(--border);
+  border-radius: 24px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.05em;
+}
+
+.game-btn.active {
+  background: linear-gradient(135deg, #a29bfe, #6c5ce7);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 4px 14px rgba(108,92,231,0.4);
+}
+
+.game-btn:not(.active):hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
 /* Tabs */
 .tabs {
   display: flex;
