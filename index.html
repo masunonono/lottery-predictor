@@ -115,6 +115,13 @@
 
     <!-- 履歴入力タブ -->
     <section id="tab-history" class="tab-content">
+      <div class="card auto-update-card">
+        <h2>🔄 自動更新ステータス</h2>
+        <div id="auto-update-status" class="auto-update-status">
+          <span id="auto-update-msg">読み込み中...</span>
+        </div>
+      </div>
+
       <div class="card">
         <h2>当選番号を追加</h2>
         <div class="input-form">
@@ -162,6 +169,7 @@
     </footer>
   </div>
 
+  <script src="auto-update-data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

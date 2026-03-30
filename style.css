@@ -491,3 +491,27 @@ footer {
   .hot-cold-grid { grid-template-columns: 1fr; }
   :root { --ball-size: 44px; }
 }
+
+
+/* ─── Auto-update status ─── */
+.auto-update-card { padding: 16px 20px; }
+.auto-update-status {
+  margin-top: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(0,184,148,0.1);
+  border: 1px solid rgba(0,184,148,0.3);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.auto-update-status.status-warn {
+  background: rgba(253,203,110,0.1);
+  border-color: rgba(253,203,110,0.4);
+}
+.auto-update-status code {
+  font-family: 'Consolas', 'Courier New', monospace;
+  background: rgba(255,255,255,0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}

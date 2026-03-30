@@ -1,0 +1,37 @@
+name: 宝くじ当選番号 自動更新
+
+on:
+  schedule:
+    # JST 23:00 = UTC 14:00
+    - cron: '0 14 * * 1'  # 月曜（ロト6）
+    - cron: '0 14 * * 4'  # 木曜（ロト6）
+    - cron: '0 14 * * 5'  # 金曜（ロト7）
+  workflow_dispatch:       # GitHub画面から手動実行も可能
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # ファイルをコミット・プッシュするために必要
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 当選番号を取得
+        run: node updater/fetch-results.js
+
+      - name: 変更があればコミット＆プッシュ
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add web/auto-update-data.js
+          git diff --staged --quiet && echo "変更なし（新しいデータなし）" || (
+            git commit -m "auto: 当選番号更新 $(date '+%Y-%m-%d')" &&
+            git push
+          )

@@ -1373,6 +1373,25 @@ function loadHistory() {
   if (data) {
     try { history = JSON.parse(data); } catch { history = []; }
   }
+
+  // 自動更新データ（auto-update-data.js）をマージ
+  const autoData = currentGame === 'loto7'
+    ? (window.AUTO_UPDATE_LOTO7 || [])
+    : (window.AUTO_UPDATE_LOTO6 || []);
+  if (autoData.length > 0) {
+    const existingRounds = new Set(history.map(h => h.round));
+    let added = 0;
+    autoData.forEach(d => {
+      if (!existingRounds.has(d.round)) {
+        history.unshift(d);
+        added++;
+      }
+    });
+    if (added > 0) {
+      history.sort((a, b) => (b.round || 0) - (a.round || 0));
+      saveHistory();
+    }
+  }
 }
 
 // ─── Frequency analysis ───────────────────────────────────────────────────────
@@ -2033,12 +2052,34 @@ function switchGame(gameKey) {
   document.getElementById('prediction-result').classList.add('hidden');
   document.getElementById('multi-prediction-result').innerHTML = '';
   refreshAll();
+  renderAutoUpdateStatus();
 }
 
 document.querySelectorAll('.game-btn').forEach(btn => {
   btn.addEventListener('click', () => switchGame(btn.dataset.game));
 });
 
+// ─── Auto-update status UI ───────────────────────────────────────────────────
+function renderAutoUpdateStatus() {
+  const el = document.getElementById('auto-update-msg');
+  if (!el) return;
+  const ts = window.AUTO_UPDATE_TIMESTAMP;
+  const data = currentGame === 'loto7'
+    ? (window.AUTO_UPDATE_LOTO7 || [])
+    : (window.AUTO_UPDATE_LOTO6 || []);
+
+  if (!ts) {
+    el.innerHTML = '⚠️ 未取得 — <code>node updater/fetch-results.js</code> を実行してデータを更新してください。';
+    el.parentElement.classList.add('status-warn');
+    return;
+  }
+  const updated = new Date(ts).toLocaleString('ja-JP');
+  const latest = data[0] ? `最新: 第${data[0].round}回 (${data[0].date})` : 'データなし';
+  el.innerHTML = `✅ 最終更新: ${updated} — ${config.name} ${latest}`;
+  el.parentElement.classList.remove('status-warn');
+}
+
 // ─── Init ────────────────────────────────────────────────────────────────────
 loadHistory();
 refreshAll();
+renderAutoUpdateStatus();

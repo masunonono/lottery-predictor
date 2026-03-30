@@ -1,0 +1,7 @@
+[2026/3/30 23:56:00] ========== 宝くじ自動更新 開始 ==========
+[2026/3/30 23:56:00] loto7: フェッチ中... https://takarakuji.rakuten.co.jp/backnumber/loto7/lastresults/
+[2026/3/30 23:56:00] loto7: 10件取得 (最新: 第670回 2026-03-27)
+[2026/3/30 23:56:00] loto6: フェッチ中... https://takarakuji.rakuten.co.jp/backnumber/loto6/lastresults/
+[2026/3/30 23:56:00] loto6: 10件取得 (最新: 第2089回 2026-03-30)
+[2026/3/30 23:56:00] 出力完了: C:\Users\masuno\claude\lottery-predictor\web\auto-update-data.js
+[2026/3/30 23:56:00] ========== 完了 (正常) ==========
