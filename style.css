@@ -603,3 +603,24 @@ footer {
 @media (max-width: 600px) {
   .method-groups { grid-template-columns: 1fr; }
 }
+
+/* ─── Reliability badges ─── */
+.rel-badge {
+  display: inline-block;
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+  cursor: help;
+  white-space: nowrap;
+}
+.rel-5 { background: rgba(108,92,231,0.25); color: #a29bfe; border: 1px solid #6c5ce7; }
+.rel-4 { background: rgba(0,184,148,0.2);   color: #55efc4; border: 1px solid #00b894; }
+.rel-3 { background: rgba(253,203,110,0.2); color: #ffeaa7; border: 1px solid #fdcb6e; }
+.rel-2 { background: rgba(116,185,255,0.15);color: #74b9ff; border: 1px solid #4a9ff5; }
+.rel-1 { background: rgba(160,160,184,0.15);color: #a0a0b8; border: 1px solid #636e72; }
+
+.method-check { align-items: center; }

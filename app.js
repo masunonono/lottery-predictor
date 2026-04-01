@@ -2407,6 +2407,86 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
+// ─── Method reliability definitions ──────────────────────────────────────────
+// level: 5=最高, 4=高, 3=中, 2=低, 1=参考
+const METHOD_RELIABILITY = {
+  'hot': {
+    level: 3, label: '中',
+    reason: '出現頻度の偏りは実在（ロト6で最大1.68倍、ロト7で1.36倍の差）。ただし長期では収束傾向あり。'
+  },
+  'cold': {
+    level: 2, label: '低',
+    reason: '「出ていないから次に出る」はギャンブラーの誤謬に近い。頻度の低い番号が次回出る確率は統計的に低くはない。'
+  },
+  'balanced': {
+    level: 3, label: '中',
+    reason: 'ホット・コールドを混合する合理的な折衷案。単体より偏りが少なくバランスが取れている。'
+  },
+  'frequency-weighted': {
+    level: 3, label: '中',
+    reason: '頻度の実績偏りを確率に反映。根拠はあるが効果量は限定的。'
+  },
+  'random': {
+    level: 1, label: '参考',
+    reason: '統計的根拠なし。理論上どの組み合わせも等確率だが予測としての根拠はない。比較対象として利用。'
+  },
+  'interval': {
+    level: 2, label: '低',
+    reason: '出現間隔の周期性はランダム性が強く根拠は弱め。「そろそろ出る」という仮定は懐疑的に扱うべき。'
+  },
+  'cooccurrence': {
+    level: 3, label: '中',
+    reason: '共起傾向はデータから確認済み（ロト6: 26番&35番が21回同時出現、ロト7: 7番&15番が34回）。'
+  },
+  'zone-balance': {
+    level: 3, label: '中',
+    reason: 'ゾーン偏差は実在（ロト6の31-43帯が期待値の102.9%）。ただし偏差は小さく補正効果は限定的。'
+  },
+  'composite': {
+    level: 4, label: '高',
+    reason: '頻度・間隔・共起を複合スコア化。単一指標より安定した根拠を持つ。'
+  },
+  'season': {
+    level: 3, label: '中',
+    reason: '月別傾向は確認済み（ロト6: 1月と9月で合計平均17.6差、ロト7: 11月と8月で16.1差）。弱いが実在する傾向。'
+  },
+  'odd-even': {
+    level: 4, label: '高',
+    reason: 'ロト6は奇3偶3が32.4%で最頻、ロト7は奇4偶3が33.5%で最頻。過半数以外の組み合わせで約2倍の確率差あり。'
+  },
+  'sum-range': {
+    level: 4, label: '高',
+    reason: 'ロト6は合計101-160に全体の70.7%、ロト7は111-150に53.4%が集中。最も統計的有意性が高い傾向の一つ。'
+  },
+  'carryover': {
+    level: 3, label: '中',
+    reason: '繰り越し率に番号差あり（ロト6: 最高35番23%、最低25番7%）。ただし1回ずつの試行では効果は確率的。'
+  },
+  'bonus-followup': {
+    level: 3, label: '中',
+    reason: 'ロト7はボーナス→翌回本数字率が全体平均19.2%（ロト6は12.8%）。特定番号は30%超の転換率を記録。'
+  },
+  'stat-filter': {
+    level: 5, label: '最高',
+    reason: '奇偶・合計値・スパン・連続ペアの全統計条件を同時に満たす組み合わせに絞り込む。最も複合的な根拠を持つ。'
+  }
+};
+
+/** チェックボックスラベルに信頼度バッジを注入 */
+function initReliabilityBadges() {
+  document.querySelectorAll('input[name="method"]').forEach(input => {
+    const rel = METHOD_RELIABILITY[input.value];
+    if (!rel) return;
+    const label = input.closest('.method-check');
+    if (!label || label.querySelector('.rel-badge')) return;
+    const badge = document.createElement('span');
+    badge.className = `rel-badge rel-${rel.level}`;
+    badge.textContent = rel.label;
+    badge.title = rel.reason;
+    label.appendChild(badge);
+  });
+}
+
 // ─── Multi-method combined prediction ────────────────────────────────────────
 
 /** チェックされた手法一覧を取得 */
@@ -2504,6 +2584,7 @@ document.querySelectorAll('input[name="method"]').forEach(el => {
   el.addEventListener('change', updateMethodCountLabel);
 });
 updateMethodCountLabel();
+initReliabilityBadges();
 
 document.getElementById('btn-predict').addEventListener('click', () => {
   const methods = getCheckedMethods();
