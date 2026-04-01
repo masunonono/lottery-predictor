@@ -50,16 +50,15 @@
               <label class="method-check"><input type="checkbox" name="method" value="interval"><span class="method-name">出現間隔分析（そろそろ出る数字）</span><span class="rel-badge rel-2" data-reason="出現間隔の周期性はランダム性が強く根拠は弱め。「そろそろ出る」という仮定は懐疑的に扱うべき。">低</span></label>
               <label class="method-check"><input type="checkbox" name="method" value="cooccurrence"><span class="method-name">共起傾向分析（一緒に出やすい組み合わせ）</span><span class="rel-badge rel-3" data-reason="共起傾向はデータから確認済み（ロト6: 26番＆35番が21回同時出現、ロト7: 7番＆15番が34回）。">中</span></label>
               <label class="method-check"><input type="checkbox" name="method" value="zone-balance"><span class="method-name">ゾーンバランス（数字帯の偏り補正）</span><span class="rel-badge rel-3" data-reason="ゾーン偏差は実在（ロト6の31-43帯が期待値の102.9%）。ただし偏差は小さく補正効果は限定的。">中</span></label>
-              <label class="method-check"><input type="checkbox" name="method" value="composite" checked><span class="method-name">総合スコア（頻度＋間隔＋共起の複合）</span><span class="rel-badge rel-4" data-reason="頻度・間隔・共起を複合スコア化。単一指標より安定した根拠を持つ。">高</span></label>
             </div>
             <div class="method-group">
               <div class="method-group-label">統計法則ベース</div>
               <label class="method-check"><input type="checkbox" name="method" value="season" checked><span class="method-name">季節傾向（現在月の過去統計）</span><span class="rel-badge rel-3" data-reason="月別傾向は確認済み（ロト6: 1月と9月で合計平均17.6差、ロト7: 11月と8月で16.1差）。弱いが実在する傾向。">中</span></label>
               <label class="method-check"><input type="checkbox" name="method" value="odd-even" checked><span class="method-name">奇偶バランス（ゲーム別最頻パターン）</span><span class="rel-badge rel-4" data-reason="ロト6は奇3偶3が32.4%で最頻、ロト7は奇4偶3が33.5%で最頻。過半数以外の組み合わせで約2倍の確率差あり。">高</span></label>
               <label class="method-check"><input type="checkbox" name="method" value="sum-range" checked><span class="method-name">合計値絞り込み（統計的中央帯）</span><span class="rel-badge rel-4" data-reason="ロト6は合計101-160に全体の70.7%、ロト7は111-150に53.4%が集中。最も統計的有意性が高い傾向の一つ。">高</span></label>
+              <label class="method-check"><input type="checkbox" name="method" value="span-range" checked><span class="method-name">スパン絞り込み（最大値－最小値の分布）</span><span class="rel-badge rel-4" data-reason="ロト6はスパン28-38に全体の55%以上が集中、ロト7は24-33が中央帯。極端に狭い・広い組み合わせを除外する。">高</span></label>
               <label class="method-check"><input type="checkbox" name="method" value="carryover" checked><span class="method-name">繰り越し重視（前回番号の連続出現傾向）</span><span class="rel-badge rel-3" data-reason="繰り越し率に番号差あり（ロト6: 最高35番23%、最低25番7%）。ただし1回ずつの試行では効果は確率的。">中</span></label>
               <label class="method-check"><input type="checkbox" name="method" value="bonus-followup" checked><span class="method-name">ボーナス翌回（直近ボーナスの転換率）</span><span class="rel-badge rel-3" data-reason="ロト7はボーナス→翌回本数字率が全体平均19.2%（ロト6は12.8%）。特定番号は30%超の転換率を記録。">中</span></label>
-              <label class="method-check"><input type="checkbox" name="method" value="stat-filter" checked><span class="method-name">★統計フィルター総合（全条件クリア）</span><span class="rel-badge rel-5" data-reason="奇偶・合計値・スパン・連続ペアの全統計条件を同時に満たす組み合わせに絞り込む。最も複合的な根拠を持つ。">最高</span></label>
             </div>
           </div>
           <div id="rel-tooltip" class="rel-tooltip hidden"></div>

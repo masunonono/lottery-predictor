@@ -1758,30 +1758,16 @@ function predictByZoneBalance(zoneStats, freq) {
   return result.sort((a, b) => a - b);
 }
 
-function predictComposite(freq, intervalStats, matrix) {
-  const freqVals = Array.from({ length: config.maxNum }, (_, i) => freq[i + 1]);
-  const freqMax = Math.max(...freqVals);
-  const freqMin = Math.min(...freqVals);
-  const coSums = Array.from({ length: config.maxNum + 1 }, (_, n) => n === 0 ? 0 : matrix[n].reduce((s, v) => s + v, 0));
-  const coMax = Math.max(...coSums.slice(1));
-  const coMin = Math.min(...coSums.slice(1));
-  const scored = Array.from({ length: config.maxNum }, (_, i) => {
-    const n = i + 1;
-    const freqScore = freqMax > freqMin ? (freq[n] - freqMin) / (freqMax - freqMin) * 100 : 50;
-    const dueness = intervalStats[n] ? intervalStats[n].duenessScore : 50;
-    const coScore = coMax > coMin ? (coSums[n] - coMin) / (coMax - coMin) * 100 : 50;
-    return { num: n, score: 0.3 * freqScore + 0.4 * dueness + 0.3 * coScore };
-  }).sort((a, b) => b.score - a.score);
-  const top20 = scored.slice(0, 20);
-  const totalScore = top20.reduce((s, v) => s + v.score + 1, 0);
-  const pick = () => {
-    let r = Math.random() * totalScore;
-    for (const item of top20) { r -= (item.score + 1); if (r <= 0) return item.num; }
-    return top20[0].num;
-  };
-  const result = new Set();
-  while (result.size < config.pickCount) result.add(pick());
-  return Array.from(result).sort((a, b) => a - b);
+/** スパン絞り込み予測: 最大値-最小値が統計的中央帯に収まる組み合わせを生成 */
+function predictBySpanRange(freq) {
+  const [lo, hi] = config.spanOptimal;
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const nums = predictWeighted(freq);
+    const sorted = [...nums].sort((a, b) => a - b);
+    const span = sorted[sorted.length - 1] - sorted[0];
+    if (span >= lo && span <= hi) return nums;
+  }
+  return predictWeighted(freq); // fallback
 }
 
 /** 季節（現在月）の傾向に合わせた合計値帯で予測 */
@@ -1811,22 +1797,6 @@ function predictBySeason(freq) {
   return predictWeighted(blendedFreq);
 }
 
-/** ヘルパー: 番号セットが統計条件を満たすか */
-function checkStatConditions(nums) {
-  const sorted = [...nums].sort((a, b) => a - b);
-  const odds  = nums.filter(n => n % 2 === 1).length;
-  const total = nums.reduce((s, n) => s + n, 0);
-  const span  = sorted[sorted.length - 1] - sorted[0];
-  let consecPairs = 0;
-  for (let i = 0; i < sorted.length - 1; i++) if (sorted[i + 1] - sorted[i] === 1) consecPairs++;
-  return {
-    oddOk:    odds === config.bestOddCount,
-    sumOk:    total >= config.sumOptimal[0] && total <= config.sumOptimal[1],
-    spanOk:   span  >= config.spanOptimal[0] && span  <= config.spanOptimal[1],
-    consecOk: consecPairs >= 1,
-    odds, total, span, consecPairs
-  };
-}
 
 /** 奇偶バランス予測: ゲームの最頻奇偶パターンに合わせて選択 */
 function predictByOddEven(freq) {
@@ -1920,23 +1890,6 @@ function predictByBonusFollowup(freq) {
   return Array.from(result).sort((a, b) => a - b);
 }
 
-/** 統計フィルター総合予測: 奇偶・合計・連続・スパンの統計条件を全て満たす組み合わせ */
-function predictByStatFilter(freq, intervalStats, matrix) {
-  // ベース生成関数（複合スコア）
-  const base = () => predictComposite(freq, intervalStats, matrix);
-  let best = null;
-  let bestScore = -1;
-  for (let attempt = 0; attempt < 300; attempt++) {
-    const nums = base();
-    const cond = checkStatConditions(nums);
-    // 条件スコア: 奇偶1点、合計1点、スパン1点、連続1点
-    const score = (cond.oddOk ? 1 : 0) + (cond.sumOk ? 1 : 0)
-                + (cond.spanOk ? 1 : 0) + (cond.consecOk ? 1 : 0);
-    if (score > bestScore) { best = nums; bestScore = score; }
-    if (bestScore === 4) break; // 全条件クリア
-  }
-  return best || predictComposite(freq, intervalStats, matrix);
-}
 
 function makePredictionResult(main, note) {
   const bonuses = pickBonus(main);
@@ -1986,13 +1939,6 @@ function generatePrediction(method) {
       note = '数字帯（ゾーン）の出現バランスを考慮して選択しました。';
       break;
     }
-    case 'composite': {
-      const iStats2 = computeIntervalStats();
-      const matrix2 = computeCoOccurrence();
-      main = predictComposite(freq, iStats2, matrix2);
-      note = '出現頻度・出現間隔・共起傾向を総合スコアで評価して選択しました。';
-      break;
-    }
     case 'season': {
       const currentMonth = new Date().getMonth() + 1;
       const monthly = computeMonthlyStats();
@@ -2010,6 +1956,13 @@ function generatePrediction(method) {
       main = predictBySumRange(freq);
       note = `合計値が統計的中央帯（${config.sumOptimal[0]}〜${config.sumOptimal[1]}）に収まる組み合わせを選択しました。`;
       break;
+    case 'span-range': {
+      main = predictBySpanRange(freq);
+      const sorted = [...main].sort((a, b) => a - b);
+      const span = sorted[sorted.length - 1] - sorted[0];
+      note = `スパン（最大値−最小値）が統計的中央帯（${config.spanOptimal[0]}〜${config.spanOptimal[1]}）に収まる組み合わせを選択しました。（スパン: ${span}）`;
+      break;
+    }
     case 'carryover':
       main = predictByCarryover(freq);
       note = '繰り越し率の高い前回番号を引き継ぎつつ、ホット数字で補完しました。';
@@ -2018,14 +1971,6 @@ function generatePrediction(method) {
       main = predictByBonusFollowup(freq);
       note = '直近のボーナス番号のうち翌回本数字になりやすいものを優先採用しました。';
       break;
-    case 'stat-filter': {
-      const iStats3 = computeIntervalStats();
-      const matrix3 = computeCoOccurrence();
-      main = predictByStatFilter(freq, iStats3, matrix3);
-      const cond = checkStatConditions(main);
-      note = `統計条件チェック — 奇偶:${cond.oddOk?'✓':'△'} 合計:${cond.sumOk?'✓':'△'}(${cond.total}) スパン:${cond.spanOk?'✓':'△'}(${cond.span}) 連続:${cond.consecOk?'✓':'△'}(${cond.consecPairs}ペア)`;
-      break;
-    }
     default:
       main = predictRandom();
       note = '完全ランダムで生成しました。';
@@ -2433,13 +2378,12 @@ function getPicksForMethod(method, freq, intervalStats, matrix, zoneStats) {
     case 'interval':         return predictByInterval(intervalStats);
     case 'cooccurrence':     return predictByCoOccurrence(matrix, freq);
     case 'zone-balance':     return predictByZoneBalance(zoneStats, freq);
-    case 'composite':        return predictComposite(freq, intervalStats, matrix);
     case 'season':           return predictBySeason(freq);
     case 'odd-even':         return predictByOddEven(freq);
     case 'sum-range':        return predictBySumRange(freq);
+    case 'span-range':       return predictBySpanRange(freq);
     case 'carryover':        return predictByCarryover(freq);
     case 'bonus-followup':   return predictByBonusFollowup(freq);
-    case 'stat-filter':      return predictByStatFilter(freq, intervalStats, matrix);
     default:                 return predictRandom();
   }
 }
