@@ -44,6 +44,13 @@
               <option value="zone-balance">ゾーンバランス（数字帯の偏り補正）</option>
               <option value="composite">総合スコア（頻度＋間隔＋共起の複合）</option>
             </optgroup>
+            <optgroup label="統計法則ベース">
+              <option value="odd-even">奇偶バランス（ゲーム別最頻パターン）</option>
+              <option value="sum-range">合計値絞り込み（統計的中央帯）</option>
+              <option value="carryover">繰り越し重視（前回番号の連続出現傾向）</option>
+              <option value="bonus-followup">ボーナス翌回（直近ボーナスの転換率）</option>
+              <option value="stat-filter">★統計フィルター総合（全条件クリア）</option>
+            </optgroup>
           </select>
           <button id="btn-predict" class="btn-primary">予測する</button>
         </div>
@@ -110,6 +117,42 @@
         <h2>🗺 ゾーン別出現バランス</h2>
         <p class="card-desc">数字帯ごとの実績出現率と期待値との比率です。100%が理想値です。</p>
         <div id="zone-analysis" class="zone-grid"></div>
+      </div>
+
+      <div class="card">
+        <h2>⚖️ 奇数・偶数の組み合わせ分布</h2>
+        <p class="card-desc">★はそのゲームで最も多く出現するパターンです。</p>
+        <div id="odd-even-analysis"></div>
+      </div>
+
+      <div class="card">
+        <h2>➕ 本数字の合計値分布</h2>
+        <p class="card-desc">★は統計的中央帯（最頻レンジ）です。予測の合計値の目安にしてください。</p>
+        <div id="sum-dist-analysis"></div>
+      </div>
+
+      <div class="card">
+        <h2>↔️ スパン（最大値－最小値）分布</h2>
+        <p class="card-desc">★は統計的中央帯です。選択する番号の広がりの目安です。</p>
+        <div id="span-analysis"></div>
+      </div>
+
+      <div class="card">
+        <h2>🔗 連続数字（隣り合うペア）の分布</h2>
+        <p class="card-desc">★は最頻出パターンです。隣り合う番号が何ペア含まれるかの傾向です。</p>
+        <div id="consec-analysis"></div>
+      </div>
+
+      <div class="card">
+        <h2>🔄 繰り越し率ランキング（出た数字が次の回にも出る確率）</h2>
+        <p class="card-desc">出現した回の翌回にも本数字として登場した割合です。上位20番を表示します。</p>
+        <div id="carryover-analysis"></div>
+      </div>
+
+      <div class="card">
+        <h2>🎯 ボーナス数字の翌回本数字転換率</h2>
+        <p class="card-desc">ボーナス数字が翌回の本数字として出現した確率です。全体平均より高い番号を表示します。</p>
+        <div id="bonus-followup-analysis"></div>
       </div>
     </section>
 

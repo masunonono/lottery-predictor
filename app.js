@@ -10,6 +10,18 @@ const GAME_CONFIG = {
       { label: '11〜20', min: 11, max: 20, size: 10 },
       { label: '21〜30', min: 21, max: 30, size: 10 },
       { label: '31〜43', min: 31, max: 43, size: 13 }
+    ],
+    // 統計分析から導出したパラメータ
+    bestOddCount: 3,          // 最頻出の奇数個数
+    sumOptimal:  [101, 160],  // 合計値の統計的中央帯（全体の70.7%）
+    spanOptimal: [28, 38],    // スパン（最大-最小）の統計的中央帯
+    sumRanges: [
+      { label: '〜100',    lo: 0,   hi: 100 },
+      { label: '101〜120', lo: 101, hi: 120 },
+      { label: '121〜140', lo: 121, hi: 140 },
+      { label: '141〜160', lo: 141, hi: 160 },
+      { label: '161〜180', lo: 161, hi: 180 },
+      { label: '181〜',    lo: 181, hi: 999 },
     ]
   },
   loto7: {
@@ -20,6 +32,18 @@ const GAME_CONFIG = {
       { label: '11〜20', min: 11, max: 20, size: 10 },
       { label: '21〜30', min: 21, max: 30, size: 10 },
       { label: '31〜37', min: 31, max: 37, size: 7  }
+    ],
+    // 統計分析から導出したパラメータ
+    bestOddCount: 4,          // 最頻出の奇数個数
+    sumOptimal:  [111, 150],  // 合計値の統計的中央帯（全体の53%）
+    spanOptimal: [24, 33],    // スパン（最大-最小）の統計的中央帯
+    sumRanges: [
+      { label: '〜110',    lo: 0,   hi: 110 },
+      { label: '111〜130', lo: 111, hi: 130 },
+      { label: '131〜150', lo: 131, hi: 150 },
+      { label: '151〜170', lo: 151, hi: 170 },
+      { label: '171〜190', lo: 171, hi: 190 },
+      { label: '191〜',    lo: 191, hi: 999 },
     ]
   }
 };
@@ -1469,6 +1493,111 @@ function computeZoneStats() {
   });
 }
 
+// ─── Statistical analysis computations ───────────────────────────────────────
+
+/** 奇数・偶数の組み合わせ別出現分布 */
+function computeOddEvenDist() {
+  const dist = {};
+  for (let i = 0; i <= config.pickCount; i++) dist[i] = 0;
+  history.forEach(r => {
+    const odds = r.main.filter(n => n % 2 === 1).length;
+    dist[odds]++;
+  });
+  return dist;
+}
+
+/** 合計値のレンジ別分布 */
+function computeSumDist() {
+  const sums = history.map(r => r.main.reduce((s, n) => s + n, 0));
+  const avg = sums.length ? sums.reduce((s, v) => s + v, 0) / sums.length : 0;
+  const min = sums.length ? Math.min(...sums) : 0;
+  const max = sums.length ? Math.max(...sums) : 0;
+  const rangeCounts = (config.sumRanges || []).map(range => ({
+    ...range,
+    count: sums.filter(s => s >= range.lo && s <= range.hi).length
+  }));
+  return { avg, min, max, rangeCounts, sums };
+}
+
+/** スパン（最大値-最小値）の分布 */
+function computeSpanDist() {
+  if (history.length === 0) return { avg: 0, dist: [] };
+  const spans = history.map(r => Math.max(...r.main) - Math.min(...r.main));
+  const avg = spans.reduce((s, v) => s + v, 0) / spans.length;
+  const ranges = [
+    { label: '〜15',   lo: 0,  hi: 15 },
+    { label: '16〜20', lo: 16, hi: 20 },
+    { label: '21〜25', lo: 21, hi: 25 },
+    { label: '26〜30', lo: 26, hi: 30 },
+    { label: '31〜35', lo: 31, hi: 35 },
+    { label: '36〜',   lo: 36, hi: 99 },
+  ];
+  const dist = ranges.map(r => ({ ...r, count: spans.filter(s => s >= r.lo && s <= r.hi).length }));
+  return { avg, dist };
+}
+
+/** 連続数字（隣り合うペア）の分布 */
+function computeConsecDist() {
+  const dist = {};
+  history.forEach(r => {
+    const s = [...r.main].sort((a, b) => a - b);
+    let pairs = 0;
+    for (let i = 0; i < s.length - 1; i++) if (s[i + 1] - s[i] === 1) pairs++;
+    dist[pairs] = (dist[pairs] || 0) + 1;
+  });
+  return dist;
+}
+
+/** 前回との重複数の分布 */
+function computeOverlapDist() {
+  const dist = {};
+  for (let i = 0; i < history.length - 1; i++) {
+    const cur  = new Set(history[i].main);
+    const prev = new Set(history[i + 1].main);
+    let cnt = 0;
+    cur.forEach(n => { if (prev.has(n)) cnt++; });
+    dist[cnt] = (dist[cnt] || 0) + 1;
+  }
+  return dist;
+}
+
+/** 各数字の繰り越し率（出た次の回にも出る確率） */
+function computeCarryoverRates() {
+  const appear = new Array(config.maxNum + 1).fill(0);
+  const repeat = new Array(config.maxNum + 1).fill(0);
+  for (let i = 0; i < history.length - 1; i++) {
+    const cur  = history[i].main;
+    const next = new Set(history[i + 1].main);
+    cur.forEach(n => { appear[n]++; if (next.has(n)) repeat[n]++; });
+  }
+  return Array.from({ length: config.maxNum }, (_, i) => {
+    const n = i + 1;
+    return { num: n, rate: appear[n] > 0 ? repeat[n] / appear[n] : 0, appear: appear[n], repeat: repeat[n] };
+  }).sort((a, b) => b.rate - a.rate);
+}
+
+/** ボーナス番号が翌回の本数字になった確率 */
+function computeBonusToMainRates() {
+  const appear = new Array(config.maxNum + 1).fill(0);
+  const hit    = new Array(config.maxNum + 1).fill(0);
+  for (let i = 0; i < history.length - 1; i++) {
+    const bonuses = [history[i].bonus];
+    if (history[i].bonus2) bonuses.push(history[i].bonus2);
+    const nextMain = new Set(history[i + 1].main);
+    bonuses.forEach(b => { appear[b]++; if (nextMain.has(b)) hit[b]++; });
+  }
+  const total = appear.reduce((s, v) => s + v, 0);
+  const totalHit = hit.reduce((s, v) => s + v, 0);
+  const avg = total > 0 ? totalHit / total : 0;
+  return {
+    avg,
+    items: Array.from({ length: config.maxNum }, (_, i) => {
+      const n = i + 1;
+      return { num: n, rate: appear[n] > 0 ? hit[n] / appear[n] : 0, appear: appear[n], hit: hit[n] };
+    }).sort((a, b) => b.rate - a.rate)
+  };
+}
+
 // ─── Prediction algorithms ────────────────────────────────────────────────────
 function pickRandom6(pool) {
   const arr = [...pool];
@@ -1634,6 +1763,133 @@ function predictComposite(freq, intervalStats, matrix) {
   return Array.from(result).sort((a, b) => a - b);
 }
 
+/** ヘルパー: 番号セットが統計条件を満たすか */
+function checkStatConditions(nums) {
+  const sorted = [...nums].sort((a, b) => a - b);
+  const odds  = nums.filter(n => n % 2 === 1).length;
+  const total = nums.reduce((s, n) => s + n, 0);
+  const span  = sorted[sorted.length - 1] - sorted[0];
+  let consecPairs = 0;
+  for (let i = 0; i < sorted.length - 1; i++) if (sorted[i + 1] - sorted[i] === 1) consecPairs++;
+  return {
+    oddOk:    odds === config.bestOddCount,
+    sumOk:    total >= config.sumOptimal[0] && total <= config.sumOptimal[1],
+    spanOk:   span  >= config.spanOptimal[0] && span  <= config.spanOptimal[1],
+    consecOk: consecPairs >= 1,
+    odds, total, span, consecPairs
+  };
+}
+
+/** 奇偶バランス予測: ゲームの最頻奇偶パターンに合わせて選択 */
+function predictByOddEven(freq) {
+  const target = config.bestOddCount;
+  const oddPool  = Array.from({ length: config.maxNum }, (_, i) => i + 1).filter(n => n % 2 === 1);
+  const evenPool = Array.from({ length: config.maxNum }, (_, i) => i + 1).filter(n => n % 2 === 0);
+  const pickWeighted = (pool) => {
+    const total = pool.reduce((s, n) => s + freq[n] + 1, 0);
+    let r = Math.random() * total;
+    for (const n of pool) { r -= freq[n] + 1; if (r <= 0) return n; }
+    return pool[pool.length - 1];
+  };
+  const result = new Set();
+  const oddArr  = [...oddPool].sort(() => Math.random() - 0.5);
+  const evenArr = [...evenPool].sort(() => Math.random() - 0.5);
+  // 頻度加重でtarget個の奇数を選ぶ
+  for (let i = 0; i < 30 && result.size < target; i++) {
+    const candidates = oddArr.filter(n => !result.has(n));
+    if (candidates.length === 0) break;
+    result.add(pickWeighted(candidates));
+  }
+  for (let i = 0; i < 30 && result.size < config.pickCount; i++) {
+    const candidates = evenArr.filter(n => !result.has(n));
+    if (candidates.length === 0) break;
+    result.add(pickWeighted(candidates));
+  }
+  while (result.size < config.pickCount) {
+    const n = Math.floor(Math.random() * config.maxNum) + 1;
+    result.add(n);
+  }
+  return Array.from(result).sort((a, b) => a - b);
+}
+
+/** 合計値絞り込み予測: 統計的中央帯の合計値に収まる組み合わせを生成 */
+function predictBySumRange(freq) {
+  const [lo, hi] = config.sumOptimal;
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const nums = predictWeighted(freq);
+    const total = nums.reduce((s, n) => s + n, 0);
+    if (total >= lo && total <= hi) return nums;
+  }
+  return predictWeighted(freq); // fallback
+}
+
+/** 繰り越し重視予測: 繰り越し率の高い番号を1〜2個含める */
+function predictByCarryover(freq) {
+  if (history.length < 2) return predictHot(freq);
+  const carryRates = computeCarryoverRates();
+  const lastMain   = new Set(history[0].main);
+  // 前回出た番号のうち繰り越し率が高いもの
+  const carryover = carryRates
+    .filter(r => lastMain.has(r.num) && r.rate > 0)
+    .sort((a, b) => b.rate - a.rate);
+  const result = new Set();
+  // 繰り越し率上位から1〜2個採用
+  const carryCount = Math.min(2, carryover.length);
+  for (let i = 0; i < carryCount; i++) result.add(carryover[i].num);
+  // 残りはホット数字から補充
+  const ranked = getRanked(freq);
+  for (const r of ranked) {
+    if (result.size >= config.pickCount) break;
+    if (!result.has(r.num)) result.add(r.num);
+  }
+  return Array.from(result).sort((a, b) => a - b);
+}
+
+/** ボーナス翌回予測: 直近ボーナス番号の転換率を活用 */
+function predictByBonusFollowup(freq) {
+  if (history.length < 2) return predictHot(freq);
+  const b2mRates = computeBonusToMainRates();
+  const rateMap  = Object.fromEntries(b2mRates.items.map(r => [r.num, r.rate]));
+  const lastBonuses = [history[0].bonus];
+  if (history[0].bonus2) lastBonuses.push(history[0].bonus2);
+  // ボーナス番号のうち転換率の高いものを優先候補に
+  const bonusCandidates = lastBonuses
+    .sort((a, b) => (rateMap[b] || 0) - (rateMap[a] || 0));
+  const result = new Set();
+  // 転換率が平均より高いボーナス番号を採用
+  const avgRate = b2mRates.avg;
+  bonusCandidates.forEach(b => {
+    if ((rateMap[b] || 0) > avgRate && result.size < Math.ceil(config.pickCount / 3)) {
+      result.add(b);
+    }
+  });
+  // 残りをホット数字で補充
+  const ranked = getRanked(freq);
+  for (const r of ranked) {
+    if (result.size >= config.pickCount) break;
+    if (!result.has(r.num)) result.add(r.num);
+  }
+  return Array.from(result).sort((a, b) => a - b);
+}
+
+/** 統計フィルター総合予測: 奇偶・合計・連続・スパンの統計条件を全て満たす組み合わせ */
+function predictByStatFilter(freq, intervalStats, matrix) {
+  // ベース生成関数（複合スコア）
+  const base = () => predictComposite(freq, intervalStats, matrix);
+  let best = null;
+  let bestScore = -1;
+  for (let attempt = 0; attempt < 300; attempt++) {
+    const nums = base();
+    const cond = checkStatConditions(nums);
+    // 条件スコア: 奇偶1点、合計1点、スパン1点、連続1点
+    const score = (cond.oddOk ? 1 : 0) + (cond.sumOk ? 1 : 0)
+                + (cond.spanOk ? 1 : 0) + (cond.consecOk ? 1 : 0);
+    if (score > bestScore) { best = nums; bestScore = score; }
+    if (bestScore === 4) break; // 全条件クリア
+  }
+  return best || predictComposite(freq, intervalStats, matrix);
+}
+
 function makePredictionResult(main, note) {
   const bonuses = pickBonus(main);
   return { main, bonus: bonuses[0], bonus2: bonuses[1] || null, note };
@@ -1687,6 +1943,30 @@ function generatePrediction(method) {
       const matrix2 = computeCoOccurrence();
       main = predictComposite(freq, iStats2, matrix2);
       note = '出現頻度・出現間隔・共起傾向を総合スコアで評価して選択しました。';
+      break;
+    }
+    case 'odd-even':
+      main = predictByOddEven(freq);
+      note = `${config.name}の最頻出パターン（奇数${config.bestOddCount}個＋偶数${config.pickCount - config.bestOddCount}個）に合わせて選択しました。`;
+      break;
+    case 'sum-range':
+      main = predictBySumRange(freq);
+      note = `合計値が統計的中央帯（${config.sumOptimal[0]}〜${config.sumOptimal[1]}）に収まる組み合わせを選択しました。`;
+      break;
+    case 'carryover':
+      main = predictByCarryover(freq);
+      note = '繰り越し率の高い前回番号を引き継ぎつつ、ホット数字で補完しました。';
+      break;
+    case 'bonus-followup':
+      main = predictByBonusFollowup(freq);
+      note = '直近のボーナス番号のうち翌回本数字になりやすいものを優先採用しました。';
+      break;
+    case 'stat-filter': {
+      const iStats3 = computeIntervalStats();
+      const matrix3 = computeCoOccurrence();
+      main = predictByStatFilter(freq, iStats3, matrix3);
+      const cond = checkStatConditions(main);
+      note = `統計条件チェック — 奇偶:${cond.oddOk?'✓':'△'} 合計:${cond.sumOk?'✓':'△'}(${cond.total}) スパン:${cond.spanOk?'✓':'△'}(${cond.span}) 連続:${cond.consecOk?'✓':'△'}(${cond.consecPairs}ペア)`;
       break;
     }
     default:
@@ -1896,6 +2176,115 @@ function renderZoneAnalysis() {
   }).join('');
 }
 
+function renderOddEvenAnalysis() {
+  const el = document.getElementById('odd-even-analysis');
+  if (!el || history.length === 0) return;
+  const dist = computeOddEvenDist();
+  const best = config.bestOddCount;
+  el.innerHTML = Object.entries(dist).map(([odds, cnt]) => {
+    const o = parseInt(odds);
+    const e = config.pickCount - o;
+    const pct = (cnt / history.length * 100).toFixed(1);
+    const isBest = o === best;
+    return `<div class="stat-row ${isBest ? 'stat-row-best' : ''}">
+      <span class="stat-row-label">奇数${o}個＋偶数${e}個${isBest ? ' ★' : ''}</span>
+      <div class="stat-bar-wrap"><div class="stat-bar" style="width:${Math.min(100,pct*2)}%;background:${isBest?'#6c5ce7':'#636e72'}"></div></div>
+      <span class="stat-row-val">${cnt}回 (${pct}%)</span>
+    </div>`;
+  }).join('');
+}
+
+function renderSumDistAnalysis() {
+  const el = document.getElementById('sum-dist-analysis');
+  if (!el || history.length === 0) return;
+  const { avg, min, max, rangeCounts } = computeSumDist();
+  const [optLo, optHi] = config.sumOptimal;
+  const maxCnt = Math.max(...rangeCounts.map(r => r.count));
+  el.innerHTML = `<div class="sum-meta">平均 <strong>${avg.toFixed(1)}</strong> ／ 最小 ${min} ／ 最大 ${max} ／ 統計的中央帯 <strong>${optLo}〜${optHi}</strong></div>`
+    + rangeCounts.map(r => {
+      const pct = (r.count / history.length * 100).toFixed(1);
+      const isOpt = r.lo >= optLo && r.hi <= optHi;
+      const w = maxCnt > 0 ? Math.round(r.count / maxCnt * 100) : 0;
+      return `<div class="stat-row ${isOpt ? 'stat-row-best' : ''}">
+        <span class="stat-row-label">${r.label}${isOpt ? ' ★' : ''}</span>
+        <div class="stat-bar-wrap"><div class="stat-bar" style="width:${w}%;background:${isOpt?'#6c5ce7':'#636e72'}"></div></div>
+        <span class="stat-row-val">${r.count}回 (${pct}%)</span>
+      </div>`;
+    }).join('');
+}
+
+function renderSpanAnalysis() {
+  const el = document.getElementById('span-analysis');
+  if (!el || history.length === 0) return;
+  const { avg, dist } = computeSpanDist();
+  const [optLo, optHi] = config.spanOptimal;
+  const maxCnt = Math.max(...dist.map(r => r.count));
+  el.innerHTML = `<div class="sum-meta">平均スパン <strong>${avg.toFixed(1)}</strong> ／ 統計的中央帯 <strong>${optLo}〜${optHi}</strong></div>`
+    + dist.map(r => {
+      const pct = (r.count / history.length * 100).toFixed(1);
+      const isOpt = r.lo >= optLo && r.hi <= optHi;
+      const w = maxCnt > 0 ? Math.round(r.count / maxCnt * 100) : 0;
+      return `<div class="stat-row ${isOpt ? 'stat-row-best' : ''}">
+        <span class="stat-row-label">${r.label}${isOpt ? ' ★' : ''}</span>
+        <div class="stat-bar-wrap"><div class="stat-bar" style="width:${w}%;background:${isOpt?'#6c5ce7':'#636e72'}"></div></div>
+        <span class="stat-row-val">${r.count}回 (${pct}%)</span>
+      </div>`;
+    }).join('');
+}
+
+function renderConsecAnalysis() {
+  const el = document.getElementById('consec-analysis');
+  if (!el || history.length === 0) return;
+  const dist = computeConsecDist();
+  const maxCnt = Math.max(...Object.values(dist));
+  el.innerHTML = Object.entries(dist).sort((a, b) => +a[0] - +b[0]).map(([pairs, cnt]) => {
+    const pct = (cnt / history.length * 100).toFixed(1);
+    const w = maxCnt > 0 ? Math.round(cnt / maxCnt * 100) : 0;
+    const isBest = +pairs === 1;
+    return `<div class="stat-row ${isBest ? 'stat-row-best' : ''}">
+      <span class="stat-row-label">${pairs === '0' ? '連続なし' : `${pairs}ペア連続`}${isBest ? ' ★' : ''}</span>
+      <div class="stat-bar-wrap"><div class="stat-bar" style="width:${w}%;background:${isBest?'#6c5ce7':'#636e72'}"></div></div>
+      <span class="stat-row-val">${cnt}回 (${pct}%)</span>
+    </div>`;
+  }).join('');
+}
+
+function renderCarryoverAnalysis() {
+  const el = document.getElementById('carryover-analysis');
+  if (!el || history.length < 2) return;
+  const rates = computeCarryoverRates();
+  el.innerHTML = rates.slice(0, 20).map(r => {
+    const pct = (r.rate * 100).toFixed(1);
+    const w = Math.round(r.rate * 100 * 2);
+    return `<div class="interval-row">
+      <span class="interval-num">${r.num}</span>
+      <div class="interval-info">
+        <div class="dueness-bar-wrap"><div class="dueness-bar" style="width:${Math.min(100,w)}%"></div></div>
+        <span class="interval-meta">繰り越し率 ${pct}% (${r.repeat}/${r.appear}回)</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderBonusFollowupAnalysis() {
+  const el = document.getElementById('bonus-followup-analysis');
+  if (!el || history.length < 2) return;
+  const { avg, items } = computeBonusToMainRates();
+  const avgPct = (avg * 100).toFixed(1);
+  el.innerHTML = `<p class="card-desc">全体平均: ${avgPct}% ／ 平均以上の数字をTOP10表示</p>`
+    + items.filter(r => r.appear > 0 && r.rate > avg).slice(0, 10).map(r => {
+      const pct = (r.rate * 100).toFixed(1);
+      const w = Math.min(100, Math.round(r.rate * 100 * 3));
+      return `<div class="interval-row">
+        <span class="interval-num">${r.num}</span>
+        <div class="interval-info">
+          <div class="dueness-bar-wrap"><div class="dueness-bar" style="width:${w}%;background:#fdcb6e"></div></div>
+          <span class="interval-meta">翌回本数字率 ${pct}% (${r.hit}/${r.appear}回)</span>
+        </div>
+      </div>`;
+    }).join('');
+}
+
 function refreshAll() {
   renderHistory();
   renderHotCold();
@@ -1904,6 +2293,12 @@ function refreshAll() {
   renderIntervalAnalysis();
   renderCoOccurrenceAnalysis();
   renderZoneAnalysis();
+  renderOddEvenAnalysis();
+  renderSumDistAnalysis();
+  renderSpanAnalysis();
+  renderConsecAnalysis();
+  renderCarryoverAnalysis();
+  renderBonusFollowupAnalysis();
 }
 
 // ─── Event listeners ──────────────────────────────────────────────────────────
