@@ -1598,6 +1598,27 @@ function computeBonusToMainRates() {
   };
 }
 
+/** 月別の合計値平均・出現頻度を集計 */
+function computeMonthlyStats() {
+  const monthData = {};
+  for (let m = 1; m <= 12; m++) monthData[m] = { sums: [], counts: new Array(config.maxNum + 1).fill(0), total: 0 };
+  history.forEach(r => {
+    if (!r.date) return;
+    const m = parseInt(r.date.split('-')[1], 10);
+    if (!monthData[m]) return;
+    monthData[m].sums.push(r.main.reduce((s, n) => s + n, 0));
+    r.main.forEach(n => monthData[m].counts[n]++);
+    monthData[m].total++;
+  });
+  return Object.fromEntries(Object.entries(monthData).map(([m, d]) => [m, {
+    avg:    d.sums.length ? d.sums.reduce((s, v) => s + v, 0) / d.sums.length : null,
+    min:    d.sums.length ? Math.min(...d.sums) : null,
+    max:    d.sums.length ? Math.max(...d.sums) : null,
+    counts: d.counts,
+    total:  d.total
+  }]));
+}
+
 // ─── Prediction algorithms ────────────────────────────────────────────────────
 function pickRandom6(pool) {
   const arr = [...pool];
@@ -1761,6 +1782,33 @@ function predictComposite(freq, intervalStats, matrix) {
   const result = new Set();
   while (result.size < config.pickCount) result.add(pick());
   return Array.from(result).sort((a, b) => a - b);
+}
+
+/** 季節（現在月）の傾向に合わせた合計値帯で予測 */
+function predictBySeason(freq) {
+  const currentMonth = new Date().getMonth() + 1;
+  const monthly = computeMonthlyStats();
+  const mData = monthly[currentMonth];
+  // 当月データがなければ通常の合計値絞り込みにフォールバック
+  if (!mData || mData.total < 3) return predictBySumRange(freq);
+  // 当月の平均合計値 ±15 を目標帯に設定
+  const margin = 15;
+  const lo = Math.round(mData.avg - margin);
+  const hi = Math.round(mData.avg + margin);
+  // 当月の出現頻度を加味した重みづけ頻度も使用
+  const blendedFreq = freq.map((v, i) => {
+    if (i === 0) return 0;
+    const mCount = mData.counts[i] || 0;
+    const mExpected = mData.total * config.pickCount / config.maxNum;
+    const mBoost = mExpected > 0 ? mCount / mExpected : 1;
+    return v * (0.7 + 0.3 * mBoost);
+  });
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const nums = predictWeighted(blendedFreq);
+    const total = nums.reduce((s, n) => s + n, 0);
+    if (total >= lo && total <= hi) return nums;
+  }
+  return predictWeighted(blendedFreq);
 }
 
 /** ヘルパー: 番号セットが統計条件を満たすか */
@@ -1943,6 +1991,15 @@ function generatePrediction(method) {
       const matrix2 = computeCoOccurrence();
       main = predictComposite(freq, iStats2, matrix2);
       note = '出現頻度・出現間隔・共起傾向を総合スコアで評価して選択しました。';
+      break;
+    }
+    case 'season': {
+      const currentMonth = new Date().getMonth() + 1;
+      const monthly = computeMonthlyStats();
+      const mData = monthly[currentMonth];
+      main = predictBySeason(freq);
+      const avgStr = mData && mData.avg ? mData.avg.toFixed(1) : '—';
+      note = `${currentMonth}月の過去平均合計値（${avgStr}）付近を目標に、当月の出現傾向を加味して選択しました。`;
       break;
     }
     case 'odd-even':
@@ -2266,6 +2323,38 @@ function renderCarryoverAnalysis() {
   }).join('');
 }
 
+function renderMonthlyAnalysis() {
+  const el = document.getElementById('monthly-analysis');
+  if (!el || history.length === 0) return;
+  const monthly = computeMonthlyStats();
+  const currentMonth = new Date().getMonth() + 1;
+  const avgs = Object.values(monthly).filter(d => d.avg !== null).map(d => d.avg);
+  const overallAvg = avgs.length ? avgs.reduce((s, v) => s + v, 0) / avgs.length : 0;
+  const maxAvg = Math.max(...avgs);
+  const minAvg = Math.min(...avgs);
+  const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  el.innerHTML = `<p class="card-desc">全月の平均合計値: <strong>${overallAvg.toFixed(1)}</strong>　★は現在の月</p>`
+    + monthNames.map((name, i) => {
+      const m = i + 1;
+      const d = monthly[m];
+      if (!d || d.avg === null) return `<div class="stat-row"><span class="stat-row-label">${name}</span><span class="stat-row-val">データなし</span></div>`;
+      const diff = d.avg - overallAvg;
+      const diffStr = (diff >= 0 ? '+' : '') + diff.toFixed(1);
+      const diffColor = diff > 2 ? '#e17055' : diff < -2 ? '#74b9ff' : '#00b894';
+      const isCurrent = m === currentMonth;
+      // バーの長さ: 全月の中での相対位置
+      const range = maxAvg - minAvg || 1;
+      const w = Math.round((d.avg - minAvg) / range * 80 + 10);
+      return `<div class="stat-row ${isCurrent ? 'stat-row-best' : ''}">
+        <span class="stat-row-label">${name}${isCurrent ? ' ★' : ''} (${d.total}回)</span>
+        <div class="stat-bar-wrap">
+          <div class="stat-bar" style="width:${w}%;background:${isCurrent ? '#6c5ce7' : '#636e72'}"></div>
+        </div>
+        <span class="stat-row-val">${d.avg.toFixed(1)} <span style="color:${diffColor};font-size:0.8em">(${diffStr})</span></span>
+      </div>`;
+    }).join('');
+}
+
 function renderBonusFollowupAnalysis() {
   const el = document.getElementById('bonus-followup-analysis');
   if (!el || history.length < 2) return;
@@ -2299,6 +2388,7 @@ function refreshAll() {
   renderConsecAnalysis();
   renderCarryoverAnalysis();
   renderBonusFollowupAnalysis();
+  renderMonthlyAnalysis();
 }
 
 // ─── Event listeners ──────────────────────────────────────────────────────────

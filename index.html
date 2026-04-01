@@ -45,6 +45,7 @@
               <option value="composite">総合スコア（頻度＋間隔＋共起の複合）</option>
             </optgroup>
             <optgroup label="統計法則ベース">
+              <option value="season">季節傾向（現在月の過去統計に合わせた合計値）</option>
               <option value="odd-even">奇偶バランス（ゲーム別最頻パターン）</option>
               <option value="sum-range">合計値絞り込み（統計的中央帯）</option>
               <option value="carryover">繰り越し重視（前回番号の連続出現傾向）</option>
@@ -141,6 +142,12 @@
         <h2>🔗 連続数字（隣り合うペア）の分布</h2>
         <p class="card-desc">★は最頻出パターンです。隣り合う番号が何ペア含まれるかの傾向です。</p>
         <div id="consec-analysis"></div>
+      </div>
+
+      <div class="card">
+        <h2>📅 月別 合計値の平均（季節ごとの偏り）</h2>
+        <p class="card-desc">月によって出やすい数字帯に差があります。全月平均との差を色で表示します（赤=高め・青=低め）。</p>
+        <div id="monthly-analysis"></div>
       </div>
 
       <div class="card">
