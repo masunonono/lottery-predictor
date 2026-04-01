@@ -29,31 +29,43 @@
       <div class="card">
         <h2>次回予測番号</h2>
         <div class="method-selector">
-          <label>予測方法：</label>
-          <select id="predict-method">
-            <optgroup label="基本分析">
-              <option value="hot">ホット数字（出現頻度高）</option>
-              <option value="cold">コールド数字（出現頻度低）</option>
-              <option value="balanced">バランス（ホット＋コールド混合）</option>
-              <option value="frequency-weighted">頻度加重ランダム</option>
-              <option value="random">完全ランダム</option>
-            </optgroup>
-            <optgroup label="高度分析">
-              <option value="interval">出現間隔分析（そろそろ出る数字）</option>
-              <option value="cooccurrence">共起傾向分析（一緒に出やすい組み合わせ）</option>
-              <option value="zone-balance">ゾーンバランス（数字帯の偏り補正）</option>
-              <option value="composite">総合スコア（頻度＋間隔＋共起の複合）</option>
-            </optgroup>
-            <optgroup label="統計法則ベース">
-              <option value="season">季節傾向（現在月の過去統計に合わせた合計値）</option>
-              <option value="odd-even">奇偶バランス（ゲーム別最頻パターン）</option>
-              <option value="sum-range">合計値絞り込み（統計的中央帯）</option>
-              <option value="carryover">繰り越し重視（前回番号の連続出現傾向）</option>
-              <option value="bonus-followup">ボーナス翌回（直近ボーナスの転換率）</option>
-              <option value="stat-filter">★統計フィルター総合（全条件クリア）</option>
-            </optgroup>
-          </select>
-          <button id="btn-predict" class="btn-primary">予測する</button>
+          <div class="method-header">
+            <span class="method-header-label">予測手法を選択（複数可）：</span>
+            <div class="method-header-btns">
+              <button id="btn-check-all" class="btn-secondary btn-sm">全選択</button>
+              <button id="btn-uncheck-all" class="btn-secondary btn-sm">全解除</button>
+            </div>
+          </div>
+          <div class="method-groups">
+            <div class="method-group">
+              <div class="method-group-label">基本分析</div>
+              <label class="method-check"><input type="checkbox" name="method" value="hot"> ホット数字（出現頻度高）</label>
+              <label class="method-check"><input type="checkbox" name="method" value="cold"> コールド数字（出現頻度低）</label>
+              <label class="method-check"><input type="checkbox" name="method" value="balanced"> バランス（ホット＋コールド混合）</label>
+              <label class="method-check"><input type="checkbox" name="method" value="frequency-weighted"> 頻度加重ランダム</label>
+              <label class="method-check"><input type="checkbox" name="method" value="random"> 完全ランダム</label>
+            </div>
+            <div class="method-group">
+              <div class="method-group-label">高度分析</div>
+              <label class="method-check"><input type="checkbox" name="method" value="interval"> 出現間隔分析（そろそろ出る数字）</label>
+              <label class="method-check"><input type="checkbox" name="method" value="cooccurrence"> 共起傾向分析（一緒に出やすい組み合わせ）</label>
+              <label class="method-check"><input type="checkbox" name="method" value="zone-balance"> ゾーンバランス（数字帯の偏り補正）</label>
+              <label class="method-check"><input type="checkbox" name="method" value="composite" checked> 総合スコア（頻度＋間隔＋共起の複合）</label>
+            </div>
+            <div class="method-group">
+              <div class="method-group-label">統計法則ベース</div>
+              <label class="method-check"><input type="checkbox" name="method" value="season" checked> 季節傾向（現在月の過去統計）</label>
+              <label class="method-check"><input type="checkbox" name="method" value="odd-even" checked> 奇偶バランス（ゲーム別最頻パターン）</label>
+              <label class="method-check"><input type="checkbox" name="method" value="sum-range" checked> 合計値絞り込み（統計的中央帯）</label>
+              <label class="method-check"><input type="checkbox" name="method" value="carryover" checked> 繰り越し重視（前回番号の連続出現傾向）</label>
+              <label class="method-check"><input type="checkbox" name="method" value="bonus-followup" checked> ボーナス翌回（直近ボーナスの転換率）</label>
+              <label class="method-check"><input type="checkbox" name="method" value="stat-filter" checked> ★統計フィルター総合（全条件クリア）</label>
+            </div>
+          </div>
+          <div class="method-footer">
+            <span id="method-count-label" class="method-count-label"></span>
+            <button id="btn-predict" class="btn-primary">予測する</button>
+          </div>
         </div>
         <div id="prediction-result" class="prediction-result hidden">
           <div class="balls-container" id="predicted-balls"></div>

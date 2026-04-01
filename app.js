@@ -2407,9 +2407,108 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
+// ─── Multi-method combined prediction ────────────────────────────────────────
+
+/** チェックされた手法一覧を取得 */
+function getCheckedMethods() {
+  return Array.from(document.querySelectorAll('input[name="method"]:checked')).map(el => el.value);
+}
+
+/** チェック数ラベルを更新 */
+function updateMethodCountLabel() {
+  const el = document.getElementById('method-count-label');
+  if (!el) return;
+  const n = getCheckedMethods().length;
+  el.textContent = n === 0 ? '⚠️ 手法を1つ以上選択してください' : `${n}種の手法を統合して予測`;
+}
+
+/** 各手法の予測番号を取得（共通データは事前計算済みを受け取る） */
+function getPicksForMethod(method, freq, intervalStats, matrix, zoneStats) {
+  switch (method) {
+    case 'hot':              return predictHot(freq);
+    case 'cold':             return predictCold(freq);
+    case 'balanced':         return predictBalanced(freq);
+    case 'frequency-weighted': return predictWeighted(freq);
+    case 'random':           return predictRandom();
+    case 'interval':         return predictByInterval(intervalStats);
+    case 'cooccurrence':     return predictByCoOccurrence(matrix, freq);
+    case 'zone-balance':     return predictByZoneBalance(zoneStats, freq);
+    case 'composite':        return predictComposite(freq, intervalStats, matrix);
+    case 'season':           return predictBySeason(freq);
+    case 'odd-even':         return predictByOddEven(freq);
+    case 'sum-range':        return predictBySumRange(freq);
+    case 'carryover':        return predictByCarryover(freq);
+    case 'bonus-followup':   return predictByBonusFollowup(freq);
+    case 'stat-filter':      return predictByStatFilter(freq, intervalStats, matrix);
+    default:                 return predictRandom();
+  }
+}
+
+/** 複数手法の票を集計して統合予測を生成 */
+function generateCombinedPrediction(methods) {
+  if (methods.length === 0) {
+    return makePredictionResult(predictRandom(), '手法が選択されていません。ランダム生成しました。');
+  }
+  if (history.length === 0) {
+    return makePredictionResult(predictRandom(), 'データがないためランダム生成しました。');
+  }
+
+  // 共通データを一度だけ計算
+  const freq         = computeFrequency();
+  const intervalStats = computeIntervalStats();
+  const matrix       = computeCoOccurrence();
+  const zoneStats    = computeZoneStats();
+
+  // 各手法の投票を集計（得票数 = votes[number]）
+  const votes = new Array(config.maxNum + 1).fill(0);
+  const methodVotes = {}; // 手法ごとの選出番号記録
+  for (const method of methods) {
+    const picks = getPicksForMethod(method, freq, intervalStats, matrix, zoneStats);
+    methodVotes[method] = picks;
+    picks.forEach(n => votes[n]++);
+  }
+
+  // 得票を指数的に重み付け（多く選ばれた数字を優遇）
+  const weights = votes.map((v, i) => i === 0 ? 0 : Math.pow(v + 0.3, 2.5));
+  const totalW = weights.reduce((s, v) => s + v, 0);
+  const pick = () => {
+    let r = Math.random() * totalW;
+    for (let i = 1; i <= config.maxNum; i++) { r -= weights[i]; if (r <= 0) return i; }
+    return config.maxNum;
+  };
+
+  const result = new Set();
+  for (let t = 0; t < 2000 && result.size < config.pickCount; t++) result.add(pick());
+  while (result.size < config.pickCount) result.add(Math.floor(Math.random() * config.maxNum) + 1);
+  const main = Array.from(result).sort((a, b) => a - b);
+
+  // ノート: 複数手法が一致した数字を強調
+  const maxVote = Math.max(...main.map(n => votes[n]));
+  const agreed  = main.filter(n => votes[n] === maxVote && maxVote >= 2);
+  const agreeStr = agreed.length > 0 ? `【${agreed.join('・')}番が${maxVote}手法一致】` : '';
+  const note = `${methods.length}種の手法を統合。${agreeStr}`;
+
+  return makePredictionResult(main, note);
+}
+
+// ─── Checkbox controls ───────────────────────────────────────────────────────
+document.getElementById('btn-check-all').addEventListener('click', () => {
+  document.querySelectorAll('input[name="method"]').forEach(el => { el.checked = true; });
+  updateMethodCountLabel();
+});
+document.getElementById('btn-uncheck-all').addEventListener('click', () => {
+  document.querySelectorAll('input[name="method"]').forEach(el => { el.checked = false; });
+  updateMethodCountLabel();
+});
+document.querySelectorAll('input[name="method"]').forEach(el => {
+  el.addEventListener('change', updateMethodCountLabel);
+});
+updateMethodCountLabel();
+
 document.getElementById('btn-predict').addEventListener('click', () => {
-  const method = document.getElementById('predict-method').value;
-  const result = generatePrediction(method);
+  const methods = getCheckedMethods();
+  if (methods.length === 0) { updateMethodCountLabel(); return; }
+  const result = generateCombinedPrediction(methods);
   const resEl = document.getElementById('prediction-result');
   resEl.classList.remove('hidden');
   renderPrediction(
@@ -2421,12 +2520,13 @@ document.getElementById('btn-predict').addEventListener('click', () => {
 });
 
 document.getElementById('btn-multi-predict').addEventListener('click', () => {
-  const count = parseInt(document.getElementById('multi-count').value) || 5;
-  const method = document.getElementById('predict-method').value;
+  const count   = parseInt(document.getElementById('multi-count').value) || 5;
+  const methods = getCheckedMethods();
   const container = document.getElementById('multi-prediction-result');
   container.innerHTML = '';
+  if (methods.length === 0) { updateMethodCountLabel(); return; }
   for (let i = 0; i < count; i++) {
-    const result = generatePrediction(method);
+    const result = generateCombinedPrediction(methods);
     const row = document.createElement('div');
     row.className = 'multi-row';
     const label = document.createElement('span');
