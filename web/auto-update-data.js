@@ -1,4 +1,4 @@
-// 自動更新データ — 最終更新: 2026-09-17T17:55:46.659Z
+// 自動更新データ — 最終更新: 2026-09-18T17:34:47.994Z
 // このファイルは updater/fetch-results.js によって自動生成されます。手動編集しないでください。
 /* global window */
 window.AUTO_UPDATE_LOTO6 = [
@@ -135,6 +135,21 @@ window.AUTO_UPDATE_LOTO6 = [
 ];
 window.AUTO_UPDATE_LOTO7 = [
   {
+    "round": 695,
+    "date": "2026-09-18",
+    "main": [
+      5,
+      6,
+      11,
+      16,
+      22,
+      24,
+      34
+    ],
+    "bonus": 15,
+    "bonus2": 18
+  },
+  {
     "round": 694,
     "date": "2026-09-11",
     "main": [
@@ -268,21 +283,6 @@ window.AUTO_UPDATE_LOTO7 = [
     ],
     "bonus": 2,
     "bonus2": 15
-  },
-  {
-    "round": 685,
-    "date": "2026-07-10",
-    "main": [
-      1,
-      5,
-      16,
-      20,
-      21,
-      22,
-      31
-    ],
-    "bonus": 23,
-    "bonus2": 36
   }
 ];
-window.AUTO_UPDATE_TIMESTAMP = '2026-09-17T17:55:46.659Z';
+window.AUTO_UPDATE_TIMESTAMP = '2026-09-18T17:34:47.994Z';
